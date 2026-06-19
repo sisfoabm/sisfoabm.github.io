@@ -8,7 +8,7 @@ import { renderHalamanKeuangan } from './keuangan.js';
 const MENU_ITEMS = [
     { id: 'dashboard', icon: 'fa-chart-pie', label: 'Dashboard' },
     { id: 'lembaga', icon: 'fa-building', label: 'Data Lembaga' },
-    { id: 'pegawai', icon: 'fa-users-tie', label: 'Data Pegawai' },
+    { id: 'pegawai', icon: 'fa-users', label: 'Data Pegawai' },
     { id: 'anak', icon: 'fa-child', label: 'Data Anak' },
     { id: 'absensi', icon: 'fa-fingerprint', label: 'Absensi & Cuti' },
     { id: 'kalender', icon: 'fa-calendar-days', label: 'Kalender Pendidikan' },
