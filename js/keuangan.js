@@ -2396,6 +2396,12 @@ window.cetakKwitansiSPP = function(idSpp) {
 
 window.verifikasiTokenOtorisasi = function(actionDetail = "Penghapusan Data Keuangan") {
     window.currentActionDetail = actionDetail;
+
+    // BYPASS MUTLAK: Super Admin langsung tembus tanpa perlu PIN Token
+    if (window.currentUser && window.currentUser.hakAkses === 'Super Admin') {
+        return Promise.resolve(true); 
+    }
+
     return new Promise((resolve) => {
         let modal = document.createElement('div');
         modal.id = 'modal-verifikasi-token';
