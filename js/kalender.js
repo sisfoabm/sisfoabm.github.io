@@ -179,8 +179,9 @@ window.renderKalender = function() {
     const tasks = window.appState.tugas || [];
     
     // PERBAIKAN 1: Pengecekan Otorisasi Klik Format Baru
+    // PERBAIKAN 1: Pengecekan Otorisasi Klik Format Baru
     const currentUser = window.currentUser || {};
-    const isAdminOrKurikulum = currentUser.hakAkses === 'Administrator' || currentUser.hakAkses === 'Operator/TU' || (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('kurikulum'));
+    const isAdminOrKurikulum = currentUser.hakAkses === 'Super Admin' || currentUser.hakAkses === 'Administrator' || currentUser.hakAkses === 'Operator/TU' || (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('kurikulum'));
 
     // PERBAIKAN 2: Dinamisasi Hari Libur Multi-Hari dari Data Lembaga
     const lembaga = (window.appState && window.appState.lembaga && window.appState.lembaga.length > 0) ? window.appState.lembaga[0] : {};
@@ -457,7 +458,7 @@ window.renderDashboardKalender = function() {
     const tasks = window.appState.tugas || [];
 
     const currentUser = window.currentUser || {};
-    const isAdminOrKurikulum = currentUser.hakAkses === 'Administrator' || currentUser.hakAkses === 'Operator/TU' || (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('kurikulum'));
+    const isAdminOrKurikulum = currentUser.hakAkses === 'Super Admin' || currentUser.hakAkses === 'Administrator' || currentUser.hakAkses === 'Operator/TU' || (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('kurikulum'));
 
     const lembaga = (window.appState && window.appState.lembaga && window.appState.lembaga.length > 0) ? window.appState.lembaga[0] : {};
     const liburConfig = lembaga.libur || 'Hanya Ahad';
