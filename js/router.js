@@ -52,7 +52,7 @@ export function renderLayout() {
 
 window.renderSidebarMenu = function() {
     const currentUser = getFreshUser();
-    const isSuperAdmin = currentUser.hakAkses === 'Administrator' || currentUser.hakAkses === 'Operator/TU' || currentUser.role === 'admin' || currentUser.username === 'admin';
+    const isSuperAdmin = currentUser.hakAkses === 'Super Admin' || currentUser.hakAkses === 'Administrator' || currentUser.hakAkses === 'Operator/TU' || currentUser.role === 'admin' || currentUser.username === 'admin';
     const userJabatans = (currentUser.detailJabatan || []).map(j => j.namaJabatan);
     
     const wewenangMatrix = (window.appState && window.appState.lembaga && window.appState.lembaga[0] && window.appState.lembaga[0].wewenangMatrix) ? window.appState.lembaga[0].wewenangMatrix : {};
@@ -117,7 +117,7 @@ window.navigate = function(page) {
     window.renderSidebarMenu(); 
 
     const currentUser = getFreshUser();
-    const isSuperAdmin = currentUser.hakAkses === 'Administrator' || currentUser.role === 'admin' || currentUser.username === 'admin';
+    const isSuperAdmin = currentUser.hakAkses === 'Super Admin' || currentUser.hakAkses === 'Administrator' || currentUser.role === 'admin' || currentUser.username === 'admin';
     
     // Logika Cerdas Pendeteksi Jabatan Kepala / Ketua
     const isHead = isSuperAdmin || (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('kepala') || j.namaJabatan.toLowerCase().includes('ketua'));
