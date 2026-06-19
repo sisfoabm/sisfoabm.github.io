@@ -1,5 +1,5 @@
 import { db } from './firebase-init.js';
-import { collection, addDoc, doc, updateDoc, deleteDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, addDoc, doc, updateDoc, deleteDoc, getDocs, query, where, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // ==========================================
 // FUNGSI KOMPRESI, CLOUDINARY & PDF (YANG SEBELUMNYA TERHAPUS)
@@ -863,8 +863,84 @@ document.getElementById('btn-batal-peg').classList.remove('hidden');
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 };
+window.tempIdPegawaiHapus = null;
+
 window.hapusPegawai = async function(id) {
-    if (confirm("Yakin ingin menghapus pegawai ini?")) await deleteDoc(doc(db, "Pegawai", id));
+    const userAktif = window.currentUser || {};
+    
+    // Aturan Khusus: Operator/TU wajib pakai Token PIN
+    if (userAktif.hakAkses === 'Operator/TU') {
+        window.tempIdPegawaiHapus = id;
+        window.bukaModalOtorisasiHapusPegawai();
+        return;
+    }
+
+    if (confirm("Yakin ingin menghapus pegawai ini?")) {
+        try { await deleteDoc(doc(db, "Pegawai", id)); } 
+        catch (err) { alert("Gagal menghapus data!"); }
+    }
+};
+
+window.bukaModalOtorisasiHapusPegawai = function() {
+    let modal = document.getElementById('modal-otorisasi-pegawai');
+    if(!modal) {
+        modal = document.createElement('div'); modal.id = 'modal-otorisasi-pegawai';
+        modal.className = 'fixed inset-0 bg-slate-900/80 z-[200] flex items-center justify-center p-4 hidden';
+        document.body.appendChild(modal);
+    }
+    modal.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 border-t-4 border-rose-500 animate-slide-up text-center">
+            <i class="fa-solid fa-lock text-5xl text-rose-500 mb-4"></i>
+            <h3 class="text-xl font-black text-slate-800 mb-2">Otorisasi Dibutuhkan</h3>
+            <p class="text-xs text-slate-500 mb-4">Sebagai Operator/TU, Anda memerlukan PIN otorisasi dari Kepala/Admin untuk menghapus data pegawai.</p>
+            <input type="text" id="input-token-pegawai" placeholder="Masukkan 6 Digit PIN" class="w-full border-2 border-rose-200 p-3 rounded-xl font-black text-center tracking-widest text-lg focus:outline-rose-500 mb-4 bg-rose-50">
+            <div class="flex flex-col gap-2">
+                <button type="button" onclick="window.prosesCekTokenPegawai()" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-black py-3 rounded-xl shadow-lg transition">Verifikasi & Hapus</button>
+                <button type="button" onclick="window.mintaTokenPegawai(this)" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition">Minta PIN ke Kepala</button>
+                <button type="button" onclick="document.getElementById('modal-otorisasi-pegawai').classList.add('hidden')" class="w-full text-slate-400 hover:text-slate-600 font-bold py-2 transition text-sm mt-2">Batal</button>
+            </div>
+        </div>
+    `;
+    modal.classList.remove('hidden');
+};
+
+window.mintaTokenPegawai = async function(btn) {
+    const ori = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Meminta...'; btn.disabled = true;
+    try {
+        const tokenAcak = Math.floor(100000 + Math.random() * 900000).toString();
+        await setDoc(doc(db, "SistemOtorisasi", "token_hapus"), {
+            token: tokenAcak,
+            updatedAt: new Date().toISOString(),
+            requester: window.currentUser?.nama || 'Operator/TU',
+            actionDetail: 'Penghapusan Data Pegawai',
+            status: "Pending"
+        });
+        alert("Permintaan berhasil dikirim! Silakan minta PIN dari Kepala/Admin (dapat dilihat di Dasbor mereka).");
+    } catch(e) { alert("Gagal meminta token."); }
+    btn.innerHTML = ori; btn.disabled = false;
+};
+
+window.prosesCekTokenPegawai = async function() {
+    let input = document.getElementById('input-token-pegawai').value.trim();
+    if(!input) return alert("Masukkan PIN terlebih dahulu!");
+    try {
+        const snap = await getDocs(query(collection(db, "SistemOtorisasi")));
+        let validToken = "";
+        snap.forEach(d => { if(d.id === "token_hapus") validToken = d.data().token; });
+        
+        if(input === validToken && validToken !== "") {
+            await setDoc(doc(db, "SistemOtorisasi", "token_hapus"), { token: "", status: "Used" });
+            document.getElementById('modal-otorisasi-pegawai').classList.add('hidden');
+            if(window.tempIdPegawaiHapus) {
+                await deleteDoc(doc(db, "Pegawai", window.tempIdPegawaiHapus));
+                alert("Otorisasi Berhasil. Data Pegawai telah dihapus!");
+                window.tempIdPegawaiHapus = null;
+            }
+        } else {
+            alert("PIN Otorisasi Salah atau Kadaluarsa!");
+        }
+    } catch(e) { alert("Gagal memverifikasi PIN."); }
 };
 
 // ==========================================
@@ -1498,7 +1574,7 @@ export async function renderHalamanAbsensi(container) {
                             <div class="bg-blue-100 text-blue-600 p-3 rounded-xl mr-4"><i class="fa-solid fa-clipboard-user text-2xl"></i></div>
                             <h3 class="font-black text-2xl text-slate-800">Panel Presensi Anda</h3>
                         </div>
-                        ${sessionUser.hakAkses === 'Operator/TU' || sessionUser.hakAkses === 'Administrator' ? `<button onclick="window.bukaModalArsip()" id="btn-buka-arsip" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-sm shadow-sm transition"><i class="fa-solid fa-box-archive mr-2"></i> Buka Arsip Presensi</button>` : ''}
+    ${['Operator/TU', 'Administrator', 'Super Admin'].includes(sessionUser.hakAkses) ? `<button onclick="window.bukaModalArsip()" id="btn-buka-arsip" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-sm shadow-sm transition"><i class="fa-solid fa-box-archive mr-2"></i> Buka Arsip Presensi</button>` : ''}
                     </div>
                     
                     ${(isLiburPekanan || isTanggalMerah) ? `
