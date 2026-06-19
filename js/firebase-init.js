@@ -2,14 +2,13 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyA0lf4KnkbVVlIdgTEKN-QcPjpSKio_xo0",
-  authDomain: "sisfo-cda1a.firebaseapp.com",
-  databaseURL: "https://sisfo-cda1a-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "sisfo-cda1a",
-  storageBucket: "sisfo-cda1a.firebasestorage.app",
-  messagingSenderId: "651098750230",
-  appId: "1:651098750230:web:512cd32fb3623c6267e437",
-  measurementId: "G-81N8LQRKVR"
+  apiKey: "AIzaSyDpiy6wmmqwum9KApTLGshsQqT-raOyu4Q",
+  authDomain: "sisfo-d1fed.firebaseapp.com",
+  projectId: "sisfo-d1fed",
+  storageBucket: "sisfo-d1fed.firebasestorage.app",
+  messagingSenderId: "729511197052",
+  appId: "1:729511197052:web:6ed208ce102144295b0cf9",
+  measurementId: "G-FL7KZ4E684"
 };
 
 // Inisialisasi Firebase App
