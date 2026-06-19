@@ -23,7 +23,13 @@ function initRealtimeListeners() {
 
     onSnapshot(collection(db, "Pegawai"), (snapshot) => {
         window.appState.pegawai = [];
-        snapshot.forEach((doc) => window.appState.pegawai.push({ id: doc.id, ...doc.data() }));
+        snapshot.forEach((doc) => {
+            const data = doc.data();
+            // Sembunyikan Super Admin dari memori & UI agar tidak tampil di tabel pegawai
+            if (data.hakAkses !== 'Super Admin') {
+                window.appState.pegawai.push({ id: doc.id, ...data });
+            }
+        });
         if (isLayoutRendered && window.currentPage === 'pegawai') window.navigate('pegawai');
         if (isLayoutRendered && window.currentPage === 'dashboard') window.navigate('dashboard');
     });
