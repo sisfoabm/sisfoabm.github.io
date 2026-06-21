@@ -856,15 +856,12 @@ window.toggleTutupBuku = async function() {
     try {
         const batch = writeBatch(db);
         
-        // 1. Set status buku
         batch.set(doc(db, "StatusGaji", bln), { bln: bln, isClosed: !isClosed });
 
-        // 2. Sinkronisasi dengan Buku Kas (Bulk)
         const tglStr = window.getLocalISOString();
         (window.tempDataGajiBulanIni || []).forEach(gaji => {
             const docId = `KasGaji_${gaji.idPegawai}_${bln}`;
             if (!isClosed) {
-                // Jika Menutup Buku -> Masukkan ke Kas (Abaikan jika THP 0)
                 if (gaji.thpFinal > 0) {
                     batch.set(doc(db, "KasLembaga", docId), {
                         tanggal: tglStr, jenis: "Pengeluaran", kategori: "Gaji Pegawai",
@@ -872,7 +869,6 @@ window.toggleTutupBuku = async function() {
                     });
                 }
             } else {
-                // Jika Membuka Buku -> Tarik/Hapus dari Kas
                 batch.delete(doc(db, "KasLembaga", docId));
             }
         });
@@ -911,8 +907,8 @@ window.kalkulasiGajiBulk = async function() {
         const skemaGaji = lembaga.skemaGaji || {};
         const tunjanganMaster = lembaga.tunjanganMaster || [];
 
-        window.rawGajiSistem = {}; // Simpan hitungan auto
-        window.tempDataGajiBulanIni = []; // Simpan data untuk sinkronisasi kas bulk
+        window.rawGajiSistem = {}; 
+        window.tempDataGajiBulanIni = []; 
         let grandTotalGaji = 0;
 
         let trs = listPegawai.map((p, idx) => {
@@ -960,14 +956,8 @@ window.kalkulasiGajiBulk = async function() {
                 ringkasanInfo.push(`<span class="font-bold text-slate-700">${jab.namaJabatan}</span> <span class="text-[10px] bg-slate-100 px-1 rounded border">Pkk: Rp ${window.fRp(pokok)} | Tnj: Rp ${window.fRp(tPenTotal)} | PotLain: Rp ${window.fRp((telatMins * skema.potTelat) + tPotTotal)}</span>`);
             });
 
-            // Hitung Alpa (Cari Cuti/Izin)
-            const cutiP = cutiRaw.filter(c => c.pengajuId === p.id && c.status !== 'Ditolak');
-            let hariIzin = cutiP.length; // Asumsi sederhana 1 record = 1 hari izin
-            // Jika butuh alpa otomatis dari jadwal, akan kompleks. Kita sediakan slot potongan alpa berdasar cuti/izin/alpa manual di modal.
-            
             window.rawGajiSistem[p.id] = { penAuto, potAuto, nama: p.nama, bln: bln, jabatans: p.detailJabatan };
             
-            // CEK APAKAH SUDAH ADA SAVED SLIP
             let saved = savedGaji.find(g => g.idGuru === p.id);
             let finalPen = saved ? saved.pendapatan : [...penAuto];
             let finalPot = saved ? saved.potongan : [...potAuto];
@@ -1020,7 +1010,6 @@ window.bukaModalSlip = async function(idGuru) {
     
     let pen = [...raw.penAuto]; let pot = [...raw.potAuto];
     
-    // Cek apakah sudah pernah disimpan/diedit
     try {
         const snap = await getDocs(query(collection(db, "GajiBulanan"), where("idGuru", "==", idGuru), where("bln", "==", bln)));
         if (!snap.empty) {
@@ -1197,7 +1186,6 @@ window.editKasKeterangan = async function(id, ketLama) {
     }
 };
 
-// === FITUR CEKLIS & HAPUS BANYAK (BULK DELETE) ===
 window.kasCheckedIds = new Set();
 window.toggleCheckKas = function(id, isChecked) {
     if(isChecked) window.kasCheckedIds.add(id); else window.kasCheckedIds.delete(id);
@@ -1252,7 +1240,6 @@ window.hapusKasBulk = async function() {
     });
 };
 
-// === TAMBAHKAN FUNGSI MUAT ULANG KHUSUS INI TEPAT DI ATAS renderTabKas ===
 window.muatUlangTabelKas = async function(btn) {
     if(btn) { btn.dataset.ori = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat...'; btn.disabled = true; }
     try {
@@ -1267,7 +1254,7 @@ window.muatUlangTabelKas = async function(btn) {
 };
 
 export async function renderTabKas() {
-    window.renderTabKas = renderTabKas; // Proteksi pemanggilan ulang
+    window.renderTabKas = renderTabKas; 
     window.appState = window.appState || {};
     if (!window.kasCheckedIds) window.kasCheckedIds = new Set();
     
@@ -1285,9 +1272,8 @@ export async function renderTabKas() {
 
     window.kasCheckedIds.clear();
     const today = getTodayStr();
-    const firstDay = today.substring(0, 8) + '01'; // Default tgl 1 bulan ini
+    const firstDay = today.substring(0, 8) + '01'; 
 
-    // HITUNG GRAND TOTAL KESELURUHAN (Tanpa Filter)
     const allKas = window.appState.kas || [];
     const grandMasuk = allKas.filter(k => k.jenis === 'Pemasukan').reduce((s, k) => s + Number(k.nominal), 0);
     const grandKeluar = allKas.filter(k => k.jenis === 'Pengeluaran').reduce((s, k) => s + Number(k.nominal), 0);
@@ -1384,7 +1370,6 @@ window.filterTabKas = function() {
     window.appState = window.appState || {};
     let filtered = [...(window.appState.kas || [])];
     
-    // 1. Interval Filter
     const elStart = document.getElementById('kas-filter-start');
     const elEnd = document.getElementById('kas-filter-end');
     if(elStart && elEnd) {
@@ -1401,13 +1386,11 @@ window.filterTabKas = function() {
         }
     }
 
-    // 2. Text/Dropdown Filters
     if (window.kasFilters.tanggal) filtered = filtered.filter(k => (k.tanggal||'').includes(window.kasFilters.tanggal));
     if (window.kasFilters.keterangan) filtered = filtered.filter(k => (k.keterangan || '').toLowerCase().includes(window.kasFilters.keterangan));
     if (window.kasFilters.jenis) filtered = filtered.filter(k => k.jenis === window.kasFilters.jenis);
     if (window.kasFilters.kategori) filtered = filtered.filter(k => (k.kategori || '').toLowerCase().includes(window.kasFilters.kategori));
 
-    // 3. Sorting Logic
     const f = window.kasSort.field; const o = window.kasSort.order;
     filtered.sort((a, b) => {
         let valA, valB;
@@ -1419,12 +1402,10 @@ window.filterTabKas = function() {
         return o === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
     });
 
-    // 4. Hitung Total Sesuai Filter
     let tMasuk = filtered.filter(k => k.jenis === 'Pemasukan').reduce((s, k) => s + Number(k.nominal), 0);
     let tKeluar = filtered.filter(k => k.jenis === 'Pengeluaran').reduce((s, k) => s + Number(k.nominal), 0);
     let sld = tMasuk - tKeluar;
 
-    // UPDATE KARTU BAWAH (Filter)
     const elMasuk = document.getElementById('kas-filter-masuk'); if(elMasuk) elMasuk.innerText = 'Rp ' + window.fRp(tMasuk);
     const elKeluar = document.getElementById('kas-filter-keluar'); if(elKeluar) elKeluar.innerText = 'Rp ' + window.fRp(tKeluar);
     const elSaldo = document.getElementById('kas-filter-saldo'); if(elSaldo) elSaldo.innerText = 'Rp ' + window.fRp(sld);
@@ -1438,10 +1419,8 @@ window.filterTabKas = function() {
         curBalance = curBalance - (isM ? Number(k.nominal) : -Number(k.nominal));
         const isCkd = window.kasCheckedIds && window.kasCheckedIds.has(k.id) ? 'checked' : '';
         
-        // Ubah YYYY-MM-DD menjadi DD/MM/YYYY untuk tampilan seragam
         const tglDisplay = k.tanggal && k.tanggal.includes('-') ? k.tanggal.split('-').reverse().join('/') : k.tanggal;
 
-        // Logika Dinamis Warna Saldo (Biru normal, Merah Glowing Berkedip jika Minus)
         const saldoColorClass = bBal < 0 ? 'text-red-500 animate-pulse drop-shadow-[0_0_8px_rgba(239,68,68,0.9)]' : 'text-indigo-700';
 
         return `
@@ -1563,6 +1542,46 @@ window.updateDropdownKategori = function(selJenis) {
     selKat.innerHTML = arrKat.map(k => `<option value="${k}">${k}</option>`).join('');
 };
 
+window.saveLocalKasBulk = function() {
+    const modal = document.getElementById('modal-kas');
+    if (!modal) return;
+    const title = modal.querySelector('h3').innerText;
+    if (!title.includes('Bulk')) return;
+
+    let dataArr = [];
+    document.querySelectorAll('.kas-row').forEach(row => {
+        dataArr.push({
+            tgl: row.querySelector('.kas-tgl').value,
+            jen: row.querySelector('.kas-jenis').value,
+            kat: row.querySelector('.kas-kat').value,
+            ket: row.querySelector('.kas-ket').value,
+            nom: row.querySelector('.kas-nom').value
+        });
+    });
+    localStorage.setItem('kas_bulk_temp', JSON.stringify(dataArr));
+};
+
+window.loadLocalKasBulk = function() {
+    const raw = localStorage.getItem('kas_bulk_temp');
+    if (!raw) return;
+    try {
+        const dataArr = JSON.parse(raw);
+        const rows = document.querySelectorAll('.kas-row');
+        dataArr.forEach((data, i) => {
+            if (rows[i]) {
+                if (data.tgl) rows[i].querySelector('.kas-tgl').value = data.tgl;
+                if (data.jen) {
+                    rows[i].querySelector('.kas-jenis').value = data.jen;
+                    window.updateDropdownKategori(rows[i].querySelector('.kas-jenis'));
+                }
+                if (data.kat) rows[i].querySelector('.kas-kat').value = data.kat;
+                if (data.ket) rows[i].querySelector('.kas-ket').value = data.ket;
+                if (data.nom) rows[i].querySelector('.kas-nom').value = data.nom;
+            }
+        });
+    } catch(e) {}
+};
+
 window.bukaModalKas = function(mode, editData = null) {
     const lembaga = window.appState.lembaga[0] || {};
     let rows = ''; const limit = mode === 'bulk' ? 5 : 1; 
@@ -1576,41 +1595,49 @@ window.bukaModalKas = function(mode, editData = null) {
             <input type="hidden" class="kas-id" value="${data.id || ''}">
             <div>
                 <label class="text-[10px] font-black text-slate-400 block mb-1 uppercase">Tanggal</label>
-                <input type="date" class="kas-tgl border-2 border-slate-200 p-2.5 rounded-lg text-xs font-bold focus:outline-indigo-500 w-full bg-white" value="${data.tanggal}" required>
+                <input type="date" class="kas-tgl border-2 border-slate-200 p-2.5 rounded-lg text-xs font-bold focus:outline-indigo-500 w-full bg-white" value="${data.tanggal}" oninput="window.saveLocalKasBulk()" required>
             </div>
             <div>
                 <label class="text-[10px] font-black text-slate-400 block mb-1 uppercase">Jenis</label>
-                <select class="kas-jenis border-2 border-slate-200 p-2.5 rounded-lg text-xs font-black focus:outline-indigo-500 w-full cursor-pointer bg-white" onchange="window.updateDropdownKategori(this)" required>
+                <select class="kas-jenis border-2 border-slate-200 p-2.5 rounded-lg text-xs font-black focus:outline-indigo-500 w-full cursor-pointer bg-white" onchange="window.updateDropdownKategori(this); window.saveLocalKasBulk();" required>
                     <option value="Pemasukan" class="text-emerald-600" ${data.jenis==='Pemasukan'?'selected':''}>Pemasukan (+)</option>
                     <option value="Pengeluaran" class="text-rose-600" ${data.jenis==='Pengeluaran'?'selected':''}>Pengeluaran (-)</option>
                 </select>
             </div>
             <div>
                 <label class="text-[10px] font-black text-slate-400 block mb-1 uppercase">Kategori</label>
-                <select class="kas-kat border-2 border-slate-200 p-2.5 rounded-lg text-xs font-bold focus:outline-indigo-500 w-full cursor-pointer bg-white" required>${optKategori}</select>
+                <select class="kas-kat border-2 border-slate-200 p-2.5 rounded-lg text-xs font-bold focus:outline-indigo-500 w-full cursor-pointer bg-white" onchange="window.saveLocalKasBulk()" required>${optKategori}</select>
             </div>
             <div>
                 <label class="text-[10px] font-black text-slate-400 block mb-1 uppercase">Keterangan (Required)</label>
-                <input type="text" class="kas-ket border-2 border-slate-200 p-2.5 rounded-lg text-xs font-bold focus:outline-indigo-500 w-full bg-white" oninput="window.autoPredictKategori(this)" value="${data.keterangan || ''}" placeholder="Cth: SPP Abdullah" required>
+                <input type="text" class="kas-ket border-2 border-slate-200 p-2.5 rounded-lg text-xs font-bold focus:outline-indigo-500 w-full bg-white" oninput="window.autoPredictKategori(this); window.saveLocalKasBulk();" value="${data.keterangan || ''}" placeholder="Cth: Beli Spidol" required>
             </div>
             <div>
                 <label class="text-[10px] font-black text-slate-400 block mb-1 uppercase">Nominal (Required)</label>
-                <input type="text" oninput="window.inRp(this)" class="kas-nom border-2 border-slate-200 p-2.5 rounded-lg text-xs font-black text-indigo-700 bg-indigo-50 focus:outline-indigo-500 w-full placeholder-indigo-300" value="${data.nominal ? window.fRp(data.nominal) : ''}" placeholder="Rp 0" required>
+                <input type="text" oninput="window.inRp(this); window.saveLocalKasBulk();" class="kas-nom border-2 border-slate-200 p-2.5 rounded-lg text-xs font-black text-indigo-700 bg-indigo-50 focus:outline-indigo-500 w-full placeholder-indigo-300" value="${data.nominal ? window.fRp(data.nominal) : ''}" placeholder="Rp 0" required>
             </div>
         </div>`;
     }
     
     let title = 'Tambah Transaksi Kas';
-    if(mode === 'bulk') title = 'Input Banyak Transaksi (Bulk)';
+    let noticeHtml = '';
+    if(mode === 'bulk') {
+        title = 'Input Banyak Transaksi (Bulk)';
+        noticeHtml = '<p class="text-[10px] text-slate-400 mt-2 font-bold text-center"><i class="fa-solid fa-circle-info mr-1"></i> <strong>Sistem Auto-Save (Draft):</strong> Ketikan Anda aman jika tidak sengaja keluar. Data otomatis kembali saat membuka menu Bulk ini lagi.</p>';
+    }
     if(mode === 'edit') title = 'Edit Transaksi Kas';
 
-    document.getElementById('modal-kas-area').innerHTML = `<div id="modal-kas" class="fixed inset-0 bg-slate-900/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-slide-up"><div class="bg-white rounded-3xl shadow-2xl w-full max-w-6xl p-6 md:p-8 flex flex-col max-h-[90vh] border-t-4 border-indigo-500"><div class="flex justify-between items-start mb-6 border-b pb-4"><h3 class="text-2xl font-black text-indigo-800"><i class="fa-solid fa-file-invoice mr-2"></i> ${title}</h3><button type="button" onclick="document.getElementById('modal-kas').remove()" class="text-slate-400 hover:text-red-500 text-3xl font-bold transition bg-slate-100 hover:bg-red-50 w-10 h-10 rounded-full flex items-center justify-center"><i class="fa-solid fa-times"></i></button></div><form onsubmit="window.simpanKas(event)" class="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-2">${rows}<div class="mt-6 border-t pt-6 flex gap-3 justify-end"><button type="button" onclick="document.getElementById('modal-kas').remove()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-8 py-4 rounded-xl transition">Batal</button><button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-10 py-4 rounded-xl shadow-xl transition transform hover:-translate-y-1"><i class="fa-solid fa-save mr-2"></i> Simpan Transaksi</button></div></form></div></div>`;
+    document.getElementById('modal-kas-area').innerHTML = `<div id="modal-kas" class="fixed inset-0 bg-slate-900/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-slide-up"><div class="bg-white rounded-3xl shadow-2xl w-full max-w-6xl p-6 md:p-8 flex flex-col max-h-[90vh] border-t-4 border-indigo-500"><div class="flex justify-between items-start mb-6 border-b pb-4"><h3 class="text-2xl font-black text-indigo-800"><i class="fa-solid fa-file-invoice mr-2"></i> ${title}</h3><button type="button" onclick="document.getElementById('modal-kas').remove()" class="text-slate-400 hover:text-red-500 text-3xl font-bold transition bg-slate-100 hover:bg-red-50 w-10 h-10 rounded-full flex items-center justify-center"><i class="fa-solid fa-times"></i></button></div><form onsubmit="window.simpanKas(event)" class="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-2">${rows}${noticeHtml}<div class="mt-6 border-t pt-6 flex gap-3 justify-end"><button type="button" onclick="document.getElementById('modal-kas').remove()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-8 py-4 rounded-xl transition">Batal</button><button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-10 py-4 rounded-xl shadow-xl transition transform hover:-translate-y-1"><i class="fa-solid fa-save mr-2"></i> Simpan Transaksi</button></div></form></div></div>`;
+    
+    if(mode === 'bulk') window.loadLocalKasBulk();
 };
 
 window.simpanKas = async function(e) {
     e.preventDefault(); const btn = e.target.querySelector('button[type="submit"]'); const ori = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Menyimpan...'; btn.disabled = true;
     try {
         const batch = writeBatch(db); let hasData = false;
+        const isBulk = document.querySelector('#modal-kas h3').innerText.includes('Bulk');
+        
         document.querySelectorAll('.kas-row').forEach(r => {
             const id = r.querySelector('.kas-id').value;
             const tgl = r.querySelector('.kas-tgl').value; const jen = r.querySelector('.kas-jenis').value; const kat = r.querySelector('.kas-kat').value; const ket = r.querySelector('.kas-ket').value; const nom = window.pRp(r.querySelector('.kas-nom').value);
@@ -1621,7 +1648,10 @@ window.simpanKas = async function(e) {
             }
         });
         if(!hasData) throw new Error("Tidak ada data valid diinput."); 
-        await batch.commit(); alert("Transaksi Kas Berhasil Disimpan!"); document.getElementById('modal-kas').remove(); window.muatUlangTabelKas();
+        
+        await batch.commit(); 
+        if(isBulk) localStorage.removeItem('kas_bulk_temp');
+        alert("Transaksi Kas Berhasil Disimpan!"); document.getElementById('modal-kas').remove(); window.muatUlangTabelKas();
     } catch(err) { alert(err.message || "Gagal!"); btn.innerHTML = ori; btn.disabled = false; }
 };
 
@@ -1680,7 +1710,6 @@ window.eksporKasCSV = function() {
     let csvContent = "sep=;\r\nTanggal;jenis;kategori;keterangan;nominal\r\n";
     kas.forEach(k => {
         let cleanKet = String(k.keterangan || '-').replace(/"/g, '""').replace(/\n/g, ' ');
-        // Konversi ke DD/MM/YYYY saat ekspor
         let tglExp = k.tanggal && k.tanggal.includes('-') ? k.tanggal.split('-').reverse().join('/') : k.tanggal;
         csvContent += `"${tglExp}";"${k.jenis}";"${k.kategori}";"${cleanKet}";${k.nominal}\r\n`;
     });
@@ -1695,7 +1724,6 @@ window.eksporKasCSV = function() {
 window.imporKasCSV = function(event) {
     const file = event.target.files[0]; if (!file) return; 
     
-    // Tampilan Loading UI
     const lblButton = event.target.parentElement;
     const originalContent = lblButton.innerHTML;
     lblButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Memproses...';
@@ -1715,37 +1743,25 @@ window.imporKasCSV = function(event) {
             if (cols && cols.length >= 5) {
                 let tgl = cols[0];
                 
-                // --- SMART DATE CONVERTER: Memaksa DD/MM/YYYY atau DD-MM-YYYY dari Excel menjadi YYYY-MM-DD ---
                 if (tgl.includes('/') || tgl.includes('-')) {
                     let p = tgl.split(/[\/\-]/);
                     if (p.length === 3) {
                         let year, month, day;
                         
-                        // Deteksi letak tahun (jika bagian depan 4 digit)
                         if (p[0].length === 4) {
-                            // Format terbaca: YYYY/MM/DD atau YYYY-MM-DD
-                            year = p[0];
-                            month = p[1];
-                            day = p[2];
+                            year = p[0]; month = p[1]; day = p[2];
                         } else {
-                            // Format terbaca: DD/MM/YYYY atau DD-MM-YYYY
                             year = p[2].length === 2 ? '20' + p[2] : p[2];
-                            month = p[1];
-                            day = p[0];
+                            month = p[1]; day = p[0];
                         }
                         
-                        // Format akhir yang wajib masuk ke database: YYYY-MM-DD
                         tgl = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
                     }
                 }
 
-                const jen = cols[1];
-                const kat = cols[2];
-                const ket = cols[3];
-                const nom = Number(cols[4]);
+                const jen = cols[1]; const kat = cols[2]; const ket = cols[3]; const nom = Number(cols[4]);
 
                 if (tgl && jen && kat && !isNaN(nom) && nom > 0) {
-                    // Pengecekan Duplikat
                     const isDuplicate = existingData.some(k => k.tanggal === tgl && k.jenis === jen && k.kategori === kat && k.keterangan === ket && Number(k.nominal) === nom);
                     if(isDuplicate) { dupCount++; continue; }
 
@@ -1759,7 +1775,7 @@ window.imporKasCSV = function(event) {
             try {
                 await batch.commit(); 
                 alert(`Berhasil mengimpor ${successCount} transaksi baru dari CSV! ${dupCount > 0 ? `\n(Aman: Mengabaikan ${dupCount} data karena terdeteksi sebagai Duplikat)` : ''}`);
-                window.muatUlangTabelKas(); // Refresh otomatis
+                window.muatUlangTabelKas(); 
             } catch(err) { alert("Gagal menyimpan data impor ke database."); lblButton.innerHTML = originalContent; }
         } else if (dupCount > 0) {
             alert(`Impor Dibatalkan.\nSistem mendeteksi bahwa keseluruhan ${dupCount} baris data CSV tersebut DUPLIKAT (sudah tercatat di Buku Kas).`);
@@ -1892,7 +1908,6 @@ window.filterTabSPP = function() {
                 ? `<span class="bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-md font-black text-xs border border-emerald-200"><i class="fa-solid fa-check-double mr-1"></i> Lunas</span>` 
                 : `<span class="bg-rose-100 text-rose-700 px-2.5 py-1 rounded-md font-black text-xs border border-rose-200"><i class="fa-solid fa-xmark mr-1"></i> Menunggak</span>`;
             
-            // TOMBOL CICIL DIHAPUS, TOMBOL LUNAS DIUBAH MENJADI TOMBOL UNIVERSAL "BAYAR SPP"
             let actionBtn = payment
                 ? `<button onclick="window.hapusBayarSPP('${payment.id}', '${payment.idKas}')" class="bg-red-50 hover:bg-red-500 text-red-500 hover:text-white px-2 py-1.5 rounded-lg transition font-bold text-[10px] mr-1 shadow-sm" title="Batal"><i class="fa-solid fa-trash"></i></button>
                    <button onclick="window.cetakKwitansiSPP('${payment.id}')" class="bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white px-2 py-1.5 rounded-lg transition font-bold text-[10px] mr-1 shadow-sm" title="Cetak Kwitansi"><i class="fa-solid fa-print"></i></button>`
@@ -2397,7 +2412,6 @@ window.cetakKwitansiSPP = function(idSpp) {
 window.verifikasiTokenOtorisasi = function(actionDetail = "Penghapusan Data Keuangan") {
     window.currentActionDetail = actionDetail;
 
-    // BYPASS MUTLAK: Super Admin langsung tembus tanpa perlu PIN Token
     if (window.currentUser && window.currentUser.hakAkses === 'Super Admin') {
         return Promise.resolve(true); 
     }
