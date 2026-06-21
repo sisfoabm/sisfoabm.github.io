@@ -8,6 +8,7 @@ import { renderHalamanKeuangan } from './keuangan.js';
 import { renderHalamanTugas } from './tugas.js';
 import { renderHalamanKepengasuhan } from './kepengasuhan.js';
 import { renderHalamanTahfidz } from './tahfidz.js';
+import { renderHalamanRaport } from './raport.js'; // <-- BARU
 
 const MENU_ITEMS = [
     { id: 'dashboard', icon: 'fa-chart-pie', label: 'Dashboard' },
@@ -20,6 +21,7 @@ const MENU_ITEMS = [
     { id: 'akademik', icon: 'fa-chalkboard-user', label: 'Akademik' },
     { id: 'kepengasuhan', icon: 'fa-bed', label: 'Kepengasuhan & Asrama' },
     { id: 'tahfidz', icon: 'fa-book-quran', label: 'Tahfidz Al-Quran' },
+    { id: 'raport', icon: 'fa-file-signature', label: 'E-Raport Digital' }, // <-- BARU
     { id: 'keuangan', icon: 'fa-sack-dollar', label: 'Payroll & Keuangan' },
 ];
 
@@ -42,10 +44,17 @@ export function renderLayout() {
     window.renderSidebarMenu(); 
     
     const currentUser = getFreshUser();
+    const lembaga = (window.appState && window.appState.lembaga && window.appState.lembaga[0]) ? window.appState.lembaga[0] : {}; // Tarik identitas lembaga
     const header = document.getElementById('app-header');
     header.innerHTML = `
-        <div class="font-bold text-xl uppercase" id="header-title">DASHBOARD</div>
-        <div class="flex items-center space-x-2 md:space-x-4">
+        <div class="flex items-center gap-3 w-full max-w-[60%]">
+            ${lembaga.logo ? `<img src="${lembaga.logo}" class="h-8 md:h-10 w-auto object-contain rounded-lg shadow-sm">` : '<i class="fa-solid fa-school text-indigo-500 text-2xl"></i>'}
+            <div class="flex flex-col truncate">
+                <span class="font-black text-sm md:text-lg uppercase text-indigo-900 truncate" id="header-title">DASHBOARD</span>
+                <span class="text-[10px] md:text-xs font-bold text-slate-500 truncate uppercase tracking-widest">${lembaga.namaLembaga || 'Sistem Informasi Internal'}</span>
+            </div>
+        </div>
+        <div class="flex items-center space-x-2 md:space-x-4 shrink-0">
             <div class="flex items-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 px-3 py-1.5 rounded-xl transition border border-transparent hover:border-slate-200 dark:hover:border-slate-600" onclick="window.navigate('pegawai')">
                 <img id="header-foto-profil" src="${(currentUser.fotoProfil && currentUser.fotoProfil.length > 0) ? currentUser.fotoProfil[0] : `https://ui-avatars.com/api/?name=${currentUser.nama || 'User'}&background=e2e8f0`}" class="w-9 h-9 rounded-full object-cover mr-2 md:mr-3 border-2 border-slate-200 shadow-sm">
                 <span id="header-nama-profil" class="font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">${currentUser.nama || 'User'}</span>
@@ -834,7 +843,7 @@ window.navigate = function(page) {
                         
                         <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Isi Pesan / Keterangan Lengkap</label>
                         <textarea id="notif-ortu-isi" rows="3" placeholder="Tulis pesan lengkap untuk wali murid..." class="w-full border-2 border-slate-200 p-3 rounded-xl text-xs font-medium mb-6 focus:outline-purple-500 bg-white shadow-sm" required></textarea>
-                        
+
                         
                         <button type="submit" class="w-full md:w-auto md:px-12 bg-purple-600 hover:bg-purple-700 text-white text-sm font-black py-4 rounded-xl shadow-lg transition transform hover:-translate-y-1 float-right"><i class="fa-solid fa-paper-plane mr-2"></i> Kirim Notifikasi</button>
                         <div class="clear-both"></div>
@@ -967,6 +976,7 @@ window.navigate = function(page) {
     } else if (page === 'akademik') { renderHalamanAkademik(container); 
     } else if (page === 'kepengasuhan') { renderHalamanKepengasuhan(container); 
     } else if (page === 'tahfidz') { renderHalamanTahfidz(container); 
+    } else if (page === 'raport') { renderHalamanRaport(container); // <-- BARU
     } else if (page === 'keuangan') { renderHalamanKeuangan(container); 
     }
 };
