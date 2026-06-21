@@ -124,8 +124,15 @@ export function renderHalamanLembaga(container) {
                     <input type="text" id="lem-lks" placeholder="Tanda Daftar LKS (Khusus Panti)" class="border p-2 rounded focus:outline-primary">
                     <input type="text" id="lem-npwp" placeholder="NPWP Lembaga" class="border p-2 rounded focus:outline-primary">
                     <input type="text" id="lem-rekening" placeholder="Rekening Bank Lembaga" class="border p-2 rounded focus:outline-primary">
-                    <input type="number" id="lem-kelas" placeholder="Jumlah Ruang Kelas" class="border p-2 rounded focus:outline-primary">
-                    <input type="number" id="lem-asrama" placeholder="Jumlah Asrama" class="border p-2 rounded focus:outline-primary">
+                    
+                    <div>
+                        <label class="text-[10px] uppercase font-bold text-slate-500 block mb-1">Jumlah Ruangan Kelas</label>
+                        <input type="number" id="lem-kelas" placeholder="Cth: 12" class="border p-2 rounded w-full focus:outline-primary">
+                    </div>
+                    <div>
+                        <label class="text-[10px] uppercase font-bold text-slate-500 block mb-1">Total Kapasitas Asrama (Anak)</label>
+                        <input type="number" id="lem-asrama" placeholder="Cth: 100" class="border p-2 rounded w-full border-teal-400 bg-teal-50 focus:outline-primary">
+                    </div>
                 </div>
                 <textarea id="lem-alamat" placeholder="Alamat Lengkap Lembaga" class="border p-2 rounded w-full mb-4 focus:outline-primary" rows="2"></textarea>
 
@@ -275,7 +282,7 @@ export function renderHalamanLembaga(container) {
                             <tr><td class="py-1 w-1/3">Sistem Presensi</td><td>: <span class="font-bold text-orange-600">${profil.kedisiplinan || '-'}</span></td></tr>
                             ${profil.kedisiplinan === 'Semi Ketat' || profil.kedisiplinan === 'Super Ketat' ? `<tr><td class="py-1">Jam Kerja</td><td>: ${profil.jamMasukKerja || '-'} s/d ${profil.jamPulangKerja || '-'}</td></tr>` : ''}
                             <tr><td class="py-1">Bentuk Pend.</td><td>: ${profil.bentukPendidikan || '-'}</td></tr>
-                            <tr><td class="py-1">Kurikulum</td><td>: ${profil.kurikulum || '-'}</td></tr>
+                            <tr><td class="py-1">Kapasitas Asrama</td><td>: ${profil.asrama || '0'} Anak</td></tr>
                             <tr><td class="py-1">Hari Libur</td><td>: ${profil.libur || '-'}</td></tr>
                         </table>
                     </div>
@@ -463,7 +470,7 @@ window.renderFotoGallery = function() {
 };
 
 window.jadikanFotoUtama = function(index) {
-    if (index === 0) return; // Sudah utama
+    if (index === 0) return; 
     const temp = window.currentPegawaiPhotos[0];
     window.currentPegawaiPhotos[0] = window.currentPegawaiPhotos[index];
     window.currentPegawaiPhotos[index] = temp;
@@ -475,9 +482,23 @@ window.hapusFotoPegawai = function(index) {
 };
 
 window.handleJabatanCheck = function(safeId) {
-    const chk = document.getElementById('chk-' + safeId);
-    const box = document.getElementById('presensi-opts-' + safeId);
-    if(chk.checked) box.classList.remove('hidden'); else box.classList.add('hidden');
+    if(safeId) {
+        const chk = document.getElementById('chk-' + safeId);
+        const box = document.getElementById('presensi-opts-' + safeId);
+        if(chk && box) {
+            if(chk.checked) box.classList.remove('hidden'); else box.classList.add('hidden');
+        }
+    }
+    
+    let isGuru = false;
+    document.querySelectorAll('input[name="peg-jabatan-chk"]:checked').forEach(el => {
+        if(el.value.toLowerCase().includes('guru')) isGuru = true;
+    });
+    const areaGuru = document.getElementById('area-guru-general');
+    if(areaGuru) {
+        if(isGuru) areaGuru.classList.remove('hidden');
+        else areaGuru.classList.add('hidden');
+    }
 };
 
 window.handleTipePresensiChange = function(safeId) {
@@ -486,6 +507,15 @@ window.handleTipePresensiChange = function(safeId) {
     if(cicoOpts) {
         if(val === 'CICO') cicoOpts.classList.remove('hidden');
         else cicoOpts.classList.add('hidden');
+    }
+};
+
+window.toggleAreaRekening = function() {
+    const val = document.getElementById('peg-jenis-rek').value;
+    const area = document.getElementById('area-rekening');
+    if(area) {
+        if(val) area.classList.remove('hidden');
+        else area.classList.add('hidden');
     }
 };
 
@@ -505,18 +535,28 @@ window.cetakProfilPegawai = function(id) {
                     <h1 class="text-3xl font-black uppercase tracking-wide text-primary">${item.nama}</h1>
                     <p class="text-xl font-bold text-slate-600 mt-1">${jabatans}</p>
                     <p class="text-sm mt-3 font-semibold text-slate-500"><i class="fa-solid fa-phone mr-2"></i> ${item.noHp || '-'}</p>
+                    <p class="text-sm font-semibold text-slate-500 mt-1"><i class="fa-solid fa-envelope mr-2"></i> ${item.email || '-'}</p>
                     <p class="text-sm font-semibold text-slate-500 mt-1"><i class="fa-solid fa-location-dot mr-2"></i> ${item.alamat || '-'}</p>
                 </div>
             </div>
             <h3 class="font-bold text-lg border-b-2 border-slate-200 mb-3 text-slate-700 pb-1">Biodata Lengkap & Kepegawaian</h3>
             <table class="w-full text-sm mb-6">
-                <tr><td class="py-2 w-1/3 font-semibold text-slate-500">NIK Identitas</td><td>: ${item.nik || '-'}</td></tr>
+                <tr><td class="py-2 w-1/3 font-semibold text-slate-500">NIP / NIY</td><td>: ${item.nip || '-'}</td></tr>
+                <tr><td class="py-2 font-semibold text-slate-500">NIK Identitas</td><td>: ${item.nik || '-'}</td></tr>
                 <tr><td class="py-2 font-semibold text-slate-500">Jenis Kelamin</td><td>: ${item.jk || '-'}</td></tr>
                 <tr><td class="py-2 font-semibold text-slate-500">Tempat, Tgl Lahir</td><td>: ${item.tempatLahir || '-'}, ${item.tglLahir || '-'}</td></tr>
                 <tr><td class="py-2 font-semibold text-slate-500">Pendidikan Terakhir</td><td>: ${item.pendidikan || '-'}</td></tr>
                 <tr><td class="py-2 font-semibold text-slate-500">Tanggal Bergabung</td><td>: ${item.tglGabung || '-'}</td></tr>
-                <tr><td class="py-2 font-semibold text-slate-500">Hak Akses Sistem</td><td>: <span class="bg-slate-200 px-2 py-1 rounded text-xs font-bold">${item.hakAkses || 'Staf Biasa'}</span></td></tr>
+                <tr><td class="py-2 font-semibold text-slate-500">Status Pegawai</td><td>: <span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-[10px] font-black">${item.statusPegawai || 'Tetap'}</span></td></tr>
+                <tr><td class="py-2 font-semibold text-slate-500">Hak Akses Sistem</td><td>: <span class="bg-slate-200 px-2 py-1 rounded text-[10px] font-bold">${item.hakAkses || 'Staf Biasa'}</span></td></tr>
                 <tr><td class="py-2 font-semibold text-slate-500">Username Akun</td><td>: ${item.username || '-'}</td></tr>
+                <tr><td class="py-2 font-semibold text-slate-500">Rekening / E-Wallet</td><td>: ${item.jenisRek ? `${item.namaBank} (${item.noRek}) a.n ${item.atasNama}` : '-'}</td></tr>
+                <tr><td class="py-2 font-semibold text-slate-500">NPWP</td><td>: ${item.npwp || '-'}</td></tr>
+                ${item.detailJabatan && item.detailJabatan.some(j => j.namaJabatan.toLowerCase().includes('guru')) ? `
+                <tr><td class="py-2 font-semibold text-slate-500">NUPTK</td><td>: ${item.nuptk || '-'}</td></tr>
+                <tr><td class="py-2 font-semibold text-slate-500">Serdik / PPG</td><td>: ${item.serdik || 'Belum'}</td></tr>
+                <tr><td class="py-2 font-semibold text-slate-500">Wali Kelas</td><td>: ${item.waliKelas && item.waliKelas !== '' ? item.waliKelas : 'Bukan Wali Kelas'}</td></tr>
+                ` : ''}
             </table>
         </div>
     `;
@@ -528,6 +568,7 @@ export function renderHalamanPegawai(container) {
     window.currentPegawaiPhotos = [];
     const profilLembaga = window.appState.lembaga[0] || {};
     const daftarJabatan = profilLembaga.daftarJabatan ? profilLembaga.daftarJabatan.split(',').map(j => j.trim()) : [];
+    const daftarKelas = profilLembaga.daftarKelas ? profilLembaga.daftarKelas.split(',').map(k => k.trim()).filter(k=>k) : [];
     
     const currentUser = window.currentUser || {};
     const isPegawaiBiasa = currentUser.hakAkses === 'Pegawai';
@@ -574,7 +615,9 @@ export function renderHalamanPegawai(container) {
             const foto = (item.fotoProfil && item.fotoProfil.length > 0) ? item.fotoProfil[0] : `https://ui-avatars.com/api/?name=${item.nama || 'Pegawai'}&background=e2e8f0&color=475569`;
             const jabatans = (item.detailJabatan || []).map(d => `<span class="inline-block bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold border border-slate-200">${d.namaJabatan} ${d.mapel && d.mapel.length > 0 ? `<span class="text-green-600">(${Array.isArray(d.mapel) ? d.mapel.join(', ') : d.mapel})</span>` : ''}</span>`).join(' ');
             
-            let badgeWarna = item.hakAkses === 'Administrator' ? 'bg-rose-50 text-rose-600 border-rose-200' : (item.hakAkses === 'Operator/TU' ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-blue-50 text-blue-600 border-blue-200');
+            const badgeWali = item.waliKelas ? `<span class="inline-block bg-purple-100 text-purple-700 px-2 py-1 rounded text-[10px] font-black border border-purple-200 mt-1"><i class="fa-solid fa-star mr-1"></i> Wali Kelas ${item.waliKelas}</span>` : '';
+
+            let badgeWarna = item.hakAkses === 'Administrator' || item.hakAkses === 'Super Admin' ? 'bg-rose-50 text-rose-600 border-rose-200' : (item.hakAkses === 'Operator/TU' ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-blue-50 text-blue-600 border-blue-200');
 
             return `
             <div class="bg-white rounded-3xl shadow-sm hover:shadow-xl transition-all duration-300 border border-slate-100 overflow-hidden flex flex-col relative group transform hover:-translate-y-1">
@@ -587,10 +630,10 @@ export function renderHalamanPegawai(container) {
                         <span class="px-3 py-1 rounded-full text-[10px] font-black tracking-wide border ${badgeWarna} shadow-sm">${item.hakAkses || 'Pegawai Biasa'}</span>
                     </div>
                     <h3 class="text-lg font-black text-slate-800 leading-tight mb-1 group-hover:text-indigo-600 transition-colors">${item.nama || '-'}</h3>
-                    <p class="text-xs font-semibold text-slate-400 mb-4"><i class="fa-solid fa-at mr-1"></i> ${item.username || '-'}</p>
+                    <p class="text-[10px] font-black text-slate-400 mb-4"><i class="fa-solid fa-id-card mr-1"></i> NIP/NIK: <span class="font-bold text-slate-500">${item.nip ? item.nip : (item.nik || '-')}</span></p>
                     
                     <div class="flex-1 mb-5">
-                        <div class="flex flex-wrap gap-1.5">${jabatans || '<span class="text-xs text-red-400 font-medium bg-red-50 px-2 py-1 rounded">Belum ditetapkan</span>'}</div>
+                        <div class="flex flex-wrap gap-1.5">${jabatans || '<span class="text-xs text-red-400 font-medium bg-red-50 px-2 py-1 rounded">Belum ditetapkan</span>'} ${badgeWali}</div>
                     </div>
                     
                     <div class="border-t border-slate-100 pt-4 flex justify-between gap-2 mt-auto">
@@ -626,22 +669,45 @@ export function renderHalamanPegawai(container) {
                             <h3 class="font-bold text-slate-400 text-xs uppercase tracking-wider mb-3"><i class="fa-solid fa-id-badge mr-2"></i> Identitas Utama</h3>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <input type="text" id="peg-nama" placeholder="Nama Lengkap (Wajib)" class="border-2 border-slate-200 p-3.5 rounded-xl focus:outline-indigo-500 font-semibold text-slate-700 bg-slate-50" required>
-                                <select id="peg-jk" class="border-2 border-slate-200 p-3.5 rounded-xl focus:outline-indigo-500 font-semibold text-slate-700 bg-slate-50">
+                                <select id="peg-jk" class="border-2 border-slate-200 p-3.5 rounded-xl focus:outline-indigo-500 font-semibold text-slate-700 bg-slate-50" required>
                                     <option value="">-- Jenis Kelamin --</option><option value="Laki-Laki">Laki-Laki</option><option value="Perempuan">Perempuan</option>
                                 </select>
-                                <input type="text" id="peg-nik" placeholder="NIK KTP (Opsional)" class="border-2 border-slate-200 p-3.5 rounded-xl focus:outline-indigo-500 font-semibold text-slate-700 bg-slate-50 md:col-span-2">
+                                <input type="text" id="peg-nik" placeholder="NIK KTP (Opsional)" class="border-2 border-slate-200 p-3.5 rounded-xl focus:outline-indigo-500 font-semibold text-slate-700 bg-slate-50">
+                                <input type="text" id="peg-nip" placeholder="NIP / NIY (Opsional)" class="border-2 border-slate-200 p-3.5 rounded-xl focus:outline-indigo-500 font-semibold text-slate-700 bg-slate-50">
+                                <input type="email" id="peg-email" placeholder="Email Aktif (Opsional)" class="border-2 border-slate-200 p-3.5 rounded-xl focus:outline-indigo-500 font-semibold text-slate-700 bg-slate-50 md:col-span-2">
                             </div>
                         </div>
 
                         <div>
-                            <h3 class="font-bold text-slate-400 text-xs uppercase tracking-wider mb-3"><i class="fa-solid fa-address-book mr-2"></i> Biodata Tambahan</h3>
+                            <h3 class="font-bold text-slate-400 text-xs uppercase tracking-wider mb-3 mt-6"><i class="fa-solid fa-address-book mr-2"></i> Biodata Tambahan & Kepegawaian</h3>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Status Pegawai</label><select id="peg-status-pegawai" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-bold text-slate-700 cursor-pointer"><option value="">-- Pilih Status --</option><option value="Tetap">Tetap</option><option value="Kontrak (PKWT)">Kontrak (PKWT)</option><option value="Harian">Harian</option><option value="Freelance">Freelance</option></select></div>
+                                <div><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">NPWP</label><input type="text" id="peg-npwp" placeholder="Opsional" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-medium"></div>
+                                <div><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Mulai Bergabung</label><input type="date" id="peg-tgl-gabung" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-medium"></div>
+                                
                                 <div><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Tempat Lahir</label><input type="text" id="peg-tempat-lahir" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-medium"></div>
                                 <div><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Tanggal Lahir</label><input type="date" id="peg-tgl-lahir" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-medium"></div>
                                 <div><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Nomor HP / WA</label><input type="text" id="peg-nohp" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-medium"></div>
-                                <div><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Pend. Terakhir</label><input type="text" id="peg-pendidikan" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-medium"></div>
-                                <div class="md:col-span-2"><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Mulai Bergabung</label><input type="date" id="peg-tgl-gabung" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-medium"></div>
+                                
+                                <div class="md:col-span-3"><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Pend. Terakhir & Gelar</label><input type="text" id="peg-pendidikan" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-medium"></div>
                                 <div class="md:col-span-3"><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Alamat Domisili</label><textarea id="peg-alamat" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-medium" rows="2"></textarea></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="font-bold text-slate-400 text-xs uppercase tracking-wider mb-3 mt-6"><i class="fa-solid fa-money-check-dollar mr-2"></i> Info Keuangan & Pembayaran</h3>
+                            <div class="bg-emerald-50 p-5 rounded-2xl border border-emerald-100">
+                                <label class="text-[10px] font-bold text-emerald-600 mb-2 block uppercase">Pilihan Rekening / E-Wallet</label>
+                                <select id="peg-jenis-rek" onchange="window.toggleAreaRekening()" class="border-2 border-emerald-200 p-3 rounded-xl w-full md:w-1/2 focus:outline-emerald-500 bg-white font-bold text-emerald-800 cursor-pointer">
+                                    <option value="">-- Belum Diatur --</option>
+                                    <option value="Bank">Rekening Bank</option>
+                                    <option value="E-Wallet">E-Wallet (Dana / OVO / Gopay / LinkAja)</option>
+                                </select>
+                                <div id="area-rekening" class="hidden mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-emerald-200 pt-4">
+                                    <div class="md:col-span-2"><label class="text-[10px] font-bold text-emerald-600 mb-1 block uppercase">Nama Bank / E-Wallet</label><input type="text" id="peg-nama-bank" placeholder="Cth: Bank Syariah Indonesia (BSI)" class="border-2 border-emerald-200 p-3 rounded-xl w-full focus:outline-emerald-500 bg-white font-bold text-slate-700"></div>
+                                    <div><label class="text-[10px] font-bold text-emerald-600 mb-1 block uppercase">Nomor Rekening / HP</label><input type="text" id="peg-no-rek" placeholder="Opsional" class="border-2 border-emerald-200 p-3 rounded-xl w-full focus:outline-emerald-500 bg-white font-bold text-slate-700"></div>
+                                    <div><label class="text-[10px] font-bold text-emerald-600 mb-1 block uppercase">Atas Nama Rekening</label><input type="text" id="peg-atas-nama" placeholder="Opsional" class="border-2 border-emerald-200 p-3 rounded-xl w-full focus:outline-emerald-500 bg-white font-bold text-slate-700"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -673,6 +739,22 @@ export function renderHalamanPegawai(container) {
                     <h3 class="font-bold text-slate-400 text-xs uppercase tracking-wider mb-4"><i class="fa-solid fa-sitemap mr-2"></i> Penempatan Jabatan & Tugas</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         ${checkboxJabatanHTML}
+                    </div>
+                    
+                    <div id="area-guru-general" class="hidden mt-6 p-5 bg-teal-50 border border-teal-100 rounded-xl">
+                        <h4 class="font-bold text-teal-800 text-sm mb-3"><i class="fa-solid fa-graduation-cap mr-2"></i> Info Tambahan Khusus Guru</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div><label class="text-[10px] font-bold text-teal-600 mb-1 block uppercase">NUPTK</label><input type="text" id="peg-nuptk" placeholder="Opsional" class="border-2 border-teal-200 p-3 rounded-xl w-full focus:outline-teal-500 bg-white font-bold text-slate-700"></div>
+                            <div><label class="text-[10px] font-bold text-teal-600 mb-1 block uppercase">Sertifikasi (Serdik)</label><select id="peg-serdik" class="border-2 border-teal-200 p-3 rounded-xl w-full focus:outline-teal-500 bg-white font-bold text-slate-700 cursor-pointer"><option value="">-- Pilih --</option><option value="Belum">Belum PPG / Serdik</option><option value="Sudah">Sudah Sertifikasi (Serdik)</option></select></div>
+                            <div>
+                                <label class="text-[10px] font-bold text-teal-600 mb-1 block uppercase">Tugas Tambahan: Wali Kelas</label>
+                                <select id="peg-walikelas" class="border-2 border-teal-200 p-3 rounded-xl w-full focus:outline-teal-500 bg-white font-bold text-slate-700 cursor-pointer">
+                                    <option value="">-- Bukan Wali Kelas --</option>
+                                    ${daftarKelas.map(k => `<option value="${k}">${k}</option>`).join('')}
+                                </select>
+                                <p class="text-[9px] text-teal-600 font-bold mt-1"><i class="fa-solid fa-rotate mr-1"></i> Data sinkron ke Portal Ortu.</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -717,14 +799,18 @@ window.simpanPegawai = async function(e) {
     let hakToSave = document.getElementById('peg-hak').value;
     let passToSave = document.getElementById('peg-pass').value;
     let userToSave = document.getElementById('peg-user').value;
+    
+    let waliKelasToSave = '';
+    let originalUser = null;
 
     if (id) {
-        const originalUser = window.appState.pegawai.find(x => x.id === id);
+        originalUser = window.appState.pegawai.find(x => x.id === id);
         
         if (isPegawaiBiasa) {
             detailJabatan = originalUser.detailJabatan || [];
             hakToSave = originalUser.hakAkses;
             userToSave = originalUser.username; 
+            waliKelasToSave = originalUser.waliKelas || '';
             if (passToSave.trim() === '') passToSave = originalUser.password;
         } else if (isOperator) {
             hakToSave = originalUser.hakAkses; 
@@ -736,6 +822,8 @@ window.simpanPegawai = async function(e) {
                 const cicoOpts = document.getElementById(`cico-val-${safeJ}`)?.value || '';
                 detailJabatan.push({ namaJabatan: el.value, tipePresensi: document.getElementById(`presensi-val-${safeJ}`).value, mapel: mapels, kuota: kuota, cicoOpts: cicoOpts });
             });
+            const wkEl = document.getElementById('peg-walikelas');
+            if (wkEl) waliKelasToSave = wkEl.value;
         } else {
             document.querySelectorAll('input[name="peg-jabatan-chk"]:checked').forEach(el => {
                 const safeJ = el.value.replace(/\s+/g, '-');
@@ -744,6 +832,8 @@ window.simpanPegawai = async function(e) {
                 const cicoOpts = document.getElementById(`cico-val-${safeJ}`)?.value || '';
                 detailJabatan.push({ namaJabatan: el.value, tipePresensi: document.getElementById(`presensi-val-${safeJ}`).value, mapel: mapels, kuota: kuota, cicoOpts: cicoOpts });
             });
+            const wkEl = document.getElementById('peg-walikelas');
+            if (wkEl) waliKelasToSave = wkEl.value;
         }
     } else {
         document.querySelectorAll('input[name="peg-jabatan-chk"]:checked').forEach(el => {
@@ -752,7 +842,9 @@ window.simpanPegawai = async function(e) {
                 const kuota = document.getElementById(`kuota-val-${safeJ}`)?.value || 0;
                 const cicoOpts = document.getElementById(`cico-val-${safeJ}`)?.value || '';
                 detailJabatan.push({ namaJabatan: el.value, tipePresensi: document.getElementById(`presensi-val-${safeJ}`).value, mapel: mapels, kuota: kuota, cicoOpts: cicoOpts });
-            });
+        });
+        const wkEl = document.getElementById('peg-walikelas');
+        if (wkEl) waliKelasToSave = wkEl.value;
     }
 
     const fileInput = document.getElementById('peg-foto-file');
@@ -762,17 +854,33 @@ window.simpanPegawai = async function(e) {
     }
 
     const data = {
-        nama: document.getElementById('peg-nama').value, jk: document.getElementById('peg-jk').value, nik: document.getElementById('peg-nik').value,
+        nama: document.getElementById('peg-nama').value, jk: document.getElementById('peg-jk').value, 
+        nik: document.getElementById('peg-nik').value, nip: document.getElementById('peg-nip').value, email: document.getElementById('peg-email').value,
         tempatLahir: document.getElementById('peg-tempat-lahir').value, tglLahir: document.getElementById('peg-tgl-lahir').value, pendidikan: document.getElementById('peg-pendidikan').value, 
         noHp: document.getElementById('peg-nohp').value, tglGabung: document.getElementById('peg-tgl-gabung').value, alamat: document.getElementById('peg-alamat').value,
-        username: userToSave, 
-        password: passToSave, 
-        hakAkses: hakToSave,
-        fotoProfil: window.currentPegawaiPhotos, detailJabatan: detailJabatan
+        statusPegawai: document.getElementById('peg-status-pegawai').value, npwp: document.getElementById('peg-npwp').value,
+        jenisRek: document.getElementById('peg-jenis-rek').value, namaBank: document.getElementById('peg-nama-bank').value, noRek: document.getElementById('peg-no-rek').value, atasNama: document.getElementById('peg-atas-nama').value,
+        nuptk: document.getElementById('peg-nuptk').value, serdik: document.getElementById('peg-serdik').value,
+        username: userToSave, password: passToSave, hakAkses: hakToSave,
+        fotoProfil: window.currentPegawaiPhotos, detailJabatan: detailJabatan, waliKelas: waliKelasToSave
     };
 
     try {
         if (id) await updateDoc(doc(db, "Pegawai", id), data); else await addDoc(collection(db, "Pegawai"), data);
+        
+        if (waliKelasToSave) {
+            const safeKelasId = waliKelasToSave.replace(/\s+/g, '-').toUpperCase();
+            await setDoc(doc(db, "Kelas", safeKelasId), {
+                nama: waliKelasToSave, waliKelas: data.nama, noHpWali: data.noHp, updatedAt: new Date().toISOString()
+            }, { merge: true });
+        }
+        
+        if (id && originalUser && originalUser.waliKelas && originalUser.waliKelas !== waliKelasToSave) {
+            const oldKelasId = originalUser.waliKelas.replace(/\s+/g, '-').toUpperCase();
+            await setDoc(doc(db, "Kelas", oldKelasId), {
+                waliKelas: "Belum diatur", noHpWali: "-", updatedAt: new Date().toISOString()
+            }, { merge: true });
+        }
         
         document.getElementById('form-pegawai').reset(); 
         document.getElementById('btn-batal-peg').classList.add('hidden');
@@ -794,49 +902,50 @@ window.editPegawai = function(id) {
         if (isPegawaiBiasa && !isSelf) return alert("Akses Ditolak!");
 
         document.getElementById('peg-id').value = item.id;
-        document.getElementById('peg-nama').value = item.nama || ''; document.getElementById('peg-jk').value = item.jk || ''; document.getElementById('peg-nik').value = item.nik || '';
+        document.getElementById('peg-nama').value = item.nama || ''; document.getElementById('peg-jk').value = item.jk || ''; 
+        document.getElementById('peg-nik').value = item.nik || ''; document.getElementById('peg-nip').value = item.nip || ''; document.getElementById('peg-email').value = item.email || '';
         document.getElementById('peg-tempat-lahir').value = item.tempatLahir || ''; document.getElementById('peg-tgl-lahir').value = item.tglLahir || ''; document.getElementById('peg-pendidikan').value = item.pendidikan || '';
         document.getElementById('peg-nohp').value = item.noHp || ''; document.getElementById('peg-tgl-gabung').value = item.tglGabung || ''; document.getElementById('peg-alamat').value = item.alamat || '';
+        document.getElementById('peg-status-pegawai').value = item.statusPegawai || ''; document.getElementById('peg-npwp').value = item.npwp || '';
+        document.getElementById('peg-jenis-rek').value = item.jenisRek || ''; document.getElementById('peg-nama-bank').value = item.namaBank || ''; document.getElementById('peg-no-rek').value = item.noRek || ''; document.getElementById('peg-atas-nama').value = item.atasNama || '';
+        document.getElementById('peg-nuptk').value = item.nuptk || ''; document.getElementById('peg-serdik').value = item.serdik || '';
         
         const userInput = document.getElementById('peg-user');
         const passInput = document.getElementById('peg-pass');
         const hakInput = document.getElementById('peg-hak');
+        const wkEl = document.getElementById('peg-walikelas');
 
         if (isPegawaiBiasa) {
             userInput.value = item.username || '';
             userInput.classList.add('bg-slate-200', 'cursor-not-allowed', 'text-slate-400');
-            passInput.value = ''; 
-            passInput.disabled = false;
-            hakInput.value = item.hakAkses || 'Pegawai';
-            hakInput.disabled = true;
+            passInput.value = ''; passInput.disabled = false;
+            hakInput.value = item.hakAkses || 'Pegawai'; hakInput.disabled = true;
         } else if (isOperator && !isSelf) {
             userInput.value = item.username || '';
-            passInput.value = '********';
-            passInput.disabled = true;
+            passInput.value = '********'; passInput.disabled = true;
             passInput.classList.add('bg-slate-200', 'cursor-not-allowed', 'text-slate-400');
-            hakInput.value = item.hakAkses || 'Pegawai';
-            hakInput.disabled = true;
+            hakInput.value = item.hakAkses || 'Pegawai'; hakInput.disabled = true;
             hakInput.classList.add('bg-slate-200', 'cursor-not-allowed', 'text-slate-400');
+            if(wkEl) wkEl.value = item.waliKelas || '';
         } else if (isOperator && isSelf) {
             userInput.value = item.username || '';
-            passInput.value = item.password || '';
-            passInput.disabled = false;
+            passInput.value = item.password || ''; passInput.disabled = false;
             passInput.classList.remove('bg-slate-200', 'cursor-not-allowed', 'text-slate-400');
-            hakInput.value = item.hakAkses || 'Pegawai';
-            hakInput.disabled = true;
+            hakInput.value = item.hakAkses || 'Pegawai'; hakInput.disabled = true;
             hakInput.classList.add('bg-slate-200', 'cursor-not-allowed', 'text-slate-400');
+            if(wkEl) wkEl.value = item.waliKelas || '';
         } else {
             userInput.value = item.username || '';
-            passInput.value = item.password || '';
-            passInput.disabled = false;
+            passInput.value = item.password || ''; passInput.disabled = false;
             passInput.classList.remove('bg-slate-200', 'cursor-not-allowed', 'text-slate-400');
-            hakInput.value = item.hakAkses || 'Pegawai';
-            hakInput.disabled = false;
+            hakInput.value = item.hakAkses || 'Pegawai'; hakInput.disabled = false;
             hakInput.classList.remove('bg-slate-200', 'cursor-not-allowed', 'text-slate-400');
+            if(wkEl) wkEl.value = item.waliKelas || '';
         }
         
         window.currentPegawaiPhotos = item.fotoProfil ? [...item.fotoProfil] : [];
         window.renderFotoGallery();
+        window.toggleAreaRekening();
 
         const jabatans = item.detailJabatan || [];
         document.querySelectorAll('input[name="peg-jabatan-chk"]').forEach(el => {
@@ -845,7 +954,6 @@ window.editPegawai = function(id) {
             if (match) {
                 el.checked = true; document.getElementById(`presensi-opts-${safeJ}`).classList.remove('hidden'); document.getElementById(`presensi-val-${safeJ}`).value = match.tipePresensi;
                 
-                // Tick Checkbox Mapel Multi & Isi Kuota
                 if (match.mapel) {
                     if (Array.isArray(match.mapel)) {
                         match.mapel.forEach(m => { const chk = document.querySelector(`.mapel-chk-${safeJ}[value="${m}"]`); if (chk) chk.checked = true; });
@@ -859,10 +967,13 @@ window.editPegawai = function(id) {
 
             } else { el.checked = false; document.getElementById(`presensi-opts-${safeJ}`).classList.add('hidden'); }
         });
-document.getElementById('btn-batal-peg').classList.remove('hidden'); 
+        
+        window.handleJabatanCheck(null);
+        document.getElementById('btn-batal-peg').classList.remove('hidden'); 
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 };
+
 window.tempIdPegawaiHapus = null;
 
 window.hapusPegawai = async function(id) {
@@ -1972,7 +2083,19 @@ window.imporDataCSV = function(event, collectionName) {
 // ==========================================
 // MODUL ANAK (DATA SISWA / SANTRI LENGKAP)
 // ==========================================
+window.toggleTransportasiAnak = function() {
+    const val = document.getElementById('anak-jenis-tinggal').value;
+    const area = document.getElementById('area-transportasi');
+    if(area) {
+        if(val === 'Asrama') area.classList.add('hidden');
+        else area.classList.remove('hidden');
+    }
+};
+
 export function renderHalamanAnak(container) {
+    const currentUser = window.currentUser || {};
+    const isBolehAksiAnak = ['Super Admin', 'Administrator', 'Operator/TU'].includes(currentUser.hakAkses);
+    
     const profilLembaga = window.appState.lembaga[0] || {};
     const daftarKelas = profilLembaga.daftarKelas ? profilLembaga.daftarKelas.split(',').map(k => k.trim()) : [];
     
@@ -1981,21 +2104,25 @@ export function renderHalamanAnak(container) {
             <td class="p-3 text-center">${index + 1}</td>
             <td class="p-3">
                 <div class="font-bold text-slate-800">${item.nama || '-'}</div>
-                <div class="text-[10px] text-slate-500">${item.nisn ? 'NISN: '+item.nisn : ''}</div>
+                <div class="text-[10px] text-slate-500">${item.nisn ? 'NISN: '+item.nisn : ''} ${item.nis ? ' | NIS: '+item.nis : ''}</div>
             </td>
             <td class="p-3 text-center font-bold text-indigo-600">${item.kelas || '-'}</td>
             <td class="p-3 text-center text-sm">${item.jk || '-'}</td>
             <td class="p-3 text-center">
-                <span class="px-2 py-1 rounded text-[10px] font-bold ${item.status === 'Reguler' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}">${item.status || '-'}</span>
+                <span class="px-2 py-1 rounded text-[10px] font-bold ${item.statusAkademik === 'Aktif' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">${item.statusAkademik || 'Aktif'}</span>
+                <span class="px-2 py-1 rounded text-[10px] font-bold bg-blue-100 text-blue-700 mt-1 block w-max mx-auto">${item.status || '-'}</span>
             </td>
+            ${isBolehAksiAnak ? `
             <td class="p-3 flex justify-center space-x-2">
                 <button onclick="window.editAnak('${item.id}')" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-bold transition"><i class="fa-solid fa-pen"></i> Edit</button>
                 <button onclick="window.hapusAnak('${item.id}')" class="bg-red-50 hover:bg-red-100 text-red-500 px-3 py-1.5 rounded-lg text-xs font-bold transition"><i class="fa-solid fa-trash"></i></button>
             </td>
+            ` : ''}
         </tr>
     `).join('');
 
     container.innerHTML = `
+        ${isBolehAksiAnak ? `
         <div class="bg-white p-6 md:p-8 rounded-2xl shadow-sm mb-6 border-t-4 border-indigo-500">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b pb-4 gap-4">
                 <h2 class="text-xl font-black text-slate-800"><i class="fa-solid fa-user-graduate text-indigo-500 mr-2"></i> Formulir Data Lengkap Anak (Siswa/Santri)</h2>
@@ -2008,84 +2135,181 @@ export function renderHalamanAnak(container) {
             <form id="form-anak" onsubmit="window.simpanAnak(event)">
                 <input type="hidden" id="anak-id">
                 
-                <h3 class="font-bold text-xs text-slate-400 uppercase tracking-wider mb-3">1. Data Pribadi Siswa</h3>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <h3 class="font-bold text-xs text-slate-400 uppercase tracking-wider mb-3"><i class="fa-solid fa-id-card mr-2"></i> 1. Identitas Utama Siswa</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
                     <div class="md:col-span-2">
-                        <label class="text-xs font-bold text-slate-600">Nama Lengkap</label>
-                        <input type="text" id="anak-nama" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-bold bg-slate-50" required>
+                        <label class="text-[10px] font-bold text-slate-600 block mb-1 uppercase">Nama Lengkap Siswa</label>
+                        <input type="text" id="anak-nama" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-bold bg-white" required>
                     </div>
                     <div>
-                        <label class="text-xs font-bold text-slate-600">NISN / NIK</label>
-                        <input type="text" id="anak-nisn" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-medium bg-slate-50">
+                        <label class="text-[10px] font-bold text-slate-600 block mb-1 uppercase">NISN</label>
+                        <input type="text" id="anak-nisn" placeholder="Opsional" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-medium bg-white">
                     </div>
                     <div>
-                        <label class="text-xs font-bold text-slate-600">Jenis Kelamin</label>
-                        <select id="anak-jk" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-medium bg-slate-50" required>
+                        <label class="text-[10px] font-bold text-slate-600 block mb-1 uppercase">NIS Sekolah</label>
+                        <input type="text" id="anak-nis" placeholder="Opsional" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-medium bg-white">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-600 block mb-1 uppercase">NIK Kependudukan</label>
+                        <input type="text" id="anak-nik" placeholder="Opsional" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-medium bg-white">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-600 block mb-1 uppercase">Jenis Kelamin</label>
+                        <select id="anak-jk" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-medium bg-white" required>
                             <option value="">-- Pilih --</option><option value="Laki-Laki">Laki-Laki</option><option value="Perempuan">Perempuan</option>
                         </select>
                     </div>
                     <div>
-                        <label class="text-xs font-bold text-slate-600">Tempat Lahir</label>
-                        <input type="text" id="anak-tempat-lahir" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-medium bg-slate-50">
+                        <label class="text-[10px] font-bold text-slate-600 block mb-1 uppercase">Tempat Lahir</label>
+                        <input type="text" id="anak-tempat-lahir" placeholder="Opsional" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-medium bg-white">
                     </div>
                     <div>
-                        <label class="text-xs font-bold text-slate-600">Tanggal Lahir</label>
-                        <input type="date" id="anak-tgl-lahir" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-medium bg-slate-50">
+                        <label class="text-[10px] font-bold text-slate-600 block mb-1 uppercase">Tanggal Lahir</label>
+                        <input type="date" id="anak-tgl-lahir" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-medium bg-white">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-600 block mb-1 uppercase">Agama</label>
+                        <select id="anak-agama" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-medium bg-white">
+                            <option value="Islam">Islam</option><option value="Kristen">Kristen</option><option value="Katolik">Katolik</option><option value="Hindu">Hindu</option><option value="Buddha">Buddha</option><option value="Konghucu">Konghucu</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-600 block mb-1 uppercase">Golongan Darah</label>
+                        <select id="anak-goldarah" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-medium bg-white">
+                            <option value="">-- Pilih --</option><option value="A">A</option><option value="B">B</option><option value="AB">AB</option><option value="O">O</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-2 col-span-1 md:col-span-2">
+                        <div class="w-1/2">
+                            <label class="text-[10px] font-bold text-slate-600 block mb-1 uppercase">Anak Ke</label>
+                            <input type="number" id="anak-ke" placeholder="Cth: 1" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-medium bg-white">
+                        </div>
+                        <div class="w-1/2">
+                            <label class="text-[10px] font-bold text-slate-600 block mb-1 uppercase">Jml Saudara Kandung</label>
+                            <input type="number" id="anak-jml-saudara" placeholder="Cth: 3" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-medium bg-white">
+                        </div>
                     </div>
                 </div>
 
-                <h3 class="font-bold text-xs text-slate-400 uppercase tracking-wider mb-3">2. Status & Akademik</h3>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <h3 class="font-bold text-xs text-slate-400 uppercase tracking-wider mb-3"><i class="fa-solid fa-graduation-cap mr-2"></i> 2. Data Akademik & Status</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-blue-50 p-4 rounded-xl border border-blue-100">
                     <div>
-                        <label class="text-xs font-bold text-slate-600">Kelas Penempatan</label>
-                        <select id="anak-kelas" class="border-2 border-indigo-200 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-bold text-indigo-700 bg-indigo-50" required>
+                        <label class="text-[10px] font-bold text-blue-700 block mb-1 uppercase">Kelas Penempatan</label>
+                        <select id="anak-kelas" class="border-2 border-blue-200 p-2.5 rounded-lg focus:outline-blue-500 w-full font-black text-blue-800 bg-white" required>
                             <option value="">-- Pilih Kelas --</option>
                             ${daftarKelas.map(k => `<option value="${k}">${k}</option>`).join('')}
                         </select>
                     </div>
                     <div>
-                        <label class="text-xs font-bold text-slate-600">Status Anak</label>
-                        <select id="anak-status" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-medium bg-slate-50" required>
-                            <option value="">-- Pilih Status --</option><option value="Reguler">Reguler / Umum</option><option value="Yatim">Yatim</option><option value="Piatu">Piatu</option><option value="Yatim Piatu">Yatim Piatu</option><option value="Dhuafa">Dhuafa</option>
+                        <label class="text-[10px] font-bold text-blue-700 block mb-1 uppercase">Status Siswa</label>
+                        <select id="anak-status-akademik" class="border-2 p-2.5 border-blue-200 rounded-lg focus:outline-blue-500 w-full font-black text-blue-800 bg-white" required>
+                            <option value="Aktif">Aktif</option><option value="Lulus">Lulus</option><option value="Pindah (Mutasi)">Pindah (Mutasi)</option><option value="Drop Out (DO)">Drop Out (DO)</option>
                         </select>
                     </div>
                     <div>
-                        <label class="text-xs font-bold text-slate-600">Status Domisili</label>
-                        <select id="anak-asrama" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-medium bg-slate-50" required>
-                            <option value="">-- Pilih --</option><option value="Ya">Berasrama</option><option value="Tidak">Pulang Pergi</option>
+                        <label class="text-[10px] font-bold text-blue-700 block mb-1 uppercase">Tahun Masuk / Angkt.</label>
+                        <input type="number" id="anak-tahun-masuk" placeholder="Cth: 2023" class="border-2 border-blue-200 p-2.5 rounded-lg focus:outline-blue-500 w-full font-medium bg-white">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-blue-700 block mb-1 uppercase">Kategori Beasiswa</label>
+                        <select id="anak-status" class="border-2 border-blue-200 p-2.5 rounded-lg focus:outline-blue-500 w-full font-medium bg-white" required>
+                            <option value="Reguler">Reguler / Umum</option><option value="Yatim">Yatim</option><option value="Piatu">Piatu</option><option value="Yatim Piatu">Yatim Piatu</option><option value="Dhuafa">Dhuafa</option>
                         </select>
-                    </div>
-                </div>
-
-                <h3 class="font-bold text-xs text-slate-400 uppercase tracking-wider mb-3">3. Data Orang Tua / Wali</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div>
-                        <label class="text-xs font-bold text-slate-600">Nama Wali / Orang Tua</label>
-                        <input type="text" id="anak-wali" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-medium bg-slate-50">
-                    </div>
-                    <div>
-                        <label class="text-xs font-bold text-slate-600">Nomor HP / WA Wali</label>
-                        <input type="text" id="anak-nohp-wali" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-medium bg-slate-50">
                     </div>
                     <div class="md:col-span-2">
-                        <label class="text-xs font-bold text-slate-600">Alamat Lengkap Tempat Tinggal</label>
-                        <textarea id="anak-alamat" rows="2" class="border-2 p-2.5 rounded-lg focus:outline-indigo-500 w-full font-medium bg-slate-50"></textarea>
+                        <label class="text-[10px] font-bold text-blue-700 block mb-1 uppercase">Asal Sekolah Sebelumnya</label>
+                        <input type="text" id="anak-asal-sekolah" placeholder="Cth: SMPN 1 Kisaran" class="border-2 border-blue-200 p-2.5 rounded-lg focus:outline-blue-500 w-full font-medium bg-white">
                     </div>
                 </div>
 
-                <div class="flex space-x-3 pt-4 border-t">
+                <h3 class="font-bold text-xs text-slate-400 uppercase tracking-wider mb-3"><i class="fa-solid fa-house-chimney mr-2"></i> 3. Data Tempat Tinggal & Jarak</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                    <div class="md:col-span-3">
+                        <label class="text-[10px] font-bold text-emerald-700 block mb-1 uppercase">Alamat Lengkap Siswa</label>
+                        <textarea id="anak-alamat" rows="2" placeholder="Sertakan RT/RW, Desa, Kecamatan..." class="border-2 border-emerald-200 p-2.5 rounded-lg focus:outline-emerald-500 w-full font-medium bg-white"></textarea>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-emerald-700 block mb-1 uppercase">Jenis Tempat Tinggal</label>
+                        <select id="anak-jenis-tinggal" onchange="window.toggleTransportasiAnak()" class="border-2 border-emerald-200 p-2.5 rounded-lg focus:outline-emerald-500 w-full font-bold text-emerald-800 bg-white" required>
+                            <option value="">-- Pilih --</option><option value="Bersama Orang Tua">Bersama Orang Tua</option><option value="Bersama Wali">Bersama Wali</option><option value="Asrama">Asrama / Pesantren</option><option value="Kos">Kos / Kontrak</option>
+                        </select>
+                    </div>
+                    <div id="area-transportasi" class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-[10px] font-bold text-emerald-700 block mb-1 uppercase">Moda Transportasi</label>
+                            <select id="anak-transportasi" class="border-2 border-emerald-200 p-2.5 rounded-lg focus:outline-emerald-500 w-full font-medium bg-white">
+                                <option value="">-- Pilih --</option><option value="Jalan Kaki">Jalan Kaki</option><option value="Sepeda">Sepeda</option><option value="Sepeda Motor">Sepeda Motor</option><option value="Antar Jemput Sekolah">Antar Jemput Sekolah</option><option value="Kendaraan Umum">Kendaraan Umum</option><option value="Lainnya">Lainnya</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-emerald-700 block mb-1 uppercase">Jarak Tempuh ke Sekolah</label>
+                            <select id="anak-jarak" class="border-2 border-emerald-200 p-2.5 rounded-lg focus:outline-emerald-500 w-full font-medium bg-white">
+                                <option value="">-- Pilih --</option><option value="Kurang dari 1 km">Kurang dari 1 km</option><option value="1 - 3 km">1 - 3 km</option><option value="3 - 5 km">3 - 5 km</option><option value="5 - 10 km">5 - 10 km</option><option value="Lebih dari 10 km">Lebih dari 10 km</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="font-bold text-xs text-slate-400 uppercase tracking-wider mb-3"><i class="fa-solid fa-users mr-2"></i> 4. Data Orang Tua / Wali</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 bg-orange-50 p-4 rounded-xl border border-orange-100">
+                    <div class="space-y-4 border-r-0 md:border-r-2 border-orange-200 pr-0 md:pr-4">
+                        <h4 class="font-black text-orange-700 border-b border-orange-200 pb-2">DATA AYAH KANDUNG</h4>
+                        <div><label class="text-[10px] font-bold text-orange-700 block mb-1 uppercase">Nama Ayah</label><input type="text" id="anak-nama-ayah" placeholder="Opsional" class="border-2 border-orange-200 p-2.5 rounded-lg focus:outline-orange-500 w-full font-bold bg-white"></div>
+                        <div><label class="text-[10px] font-bold text-orange-700 block mb-1 uppercase">NIK Ayah</label><input type="text" id="anak-nik-ayah" placeholder="Opsional" class="border-2 border-orange-200 p-2.5 rounded-lg focus:outline-orange-500 w-full font-medium bg-white"></div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div><label class="text-[10px] font-bold text-orange-700 block mb-1 uppercase">Pendidikan</label><select id="anak-pend-ayah" class="border-2 border-orange-200 p-2.5 rounded-lg focus:outline-orange-500 w-full font-medium bg-white"><option value="">-- Pilih --</option><option value="Tidak Sekolah">Tidak Sekolah</option><option value="SD/Sederajat">SD/Sederajat</option><option value="SMP/Sederajat">SMP/Sederajat</option><option value="SMA/Sederajat">SMA/Sederajat</option><option value="D1-D3">D1-D3</option><option value="S1/D4">S1/D4</option><option value="S2/S3">S2/S3</option></select></div>
+                            <div><label class="text-[10px] font-bold text-orange-700 block mb-1 uppercase">Pekerjaan</label><input type="text" id="anak-pek-ayah" placeholder="Opsional" class="border-2 border-orange-200 p-2.5 rounded-lg focus:outline-orange-500 w-full font-medium bg-white"></div>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <h4 class="font-black text-orange-700 border-b border-orange-200 pb-2">DATA IBU KANDUNG</h4>
+                        <div><label class="text-[10px] font-bold text-orange-700 block mb-1 uppercase">Nama Ibu</label><input type="text" id="anak-nama-ibu" placeholder="Opsional" class="border-2 border-orange-200 p-2.5 rounded-lg focus:outline-orange-500 w-full font-bold bg-white"></div>
+                        <div><label class="text-[10px] font-bold text-orange-700 block mb-1 uppercase">NIK Ibu</label><input type="text" id="anak-nik-ibu" placeholder="Opsional" class="border-2 border-orange-200 p-2.5 rounded-lg focus:outline-orange-500 w-full font-medium bg-white"></div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div><label class="text-[10px] font-bold text-orange-700 block mb-1 uppercase">Pendidikan</label><select id="anak-pend-ibu" class="border-2 border-orange-200 p-2.5 rounded-lg focus:outline-orange-500 w-full font-medium bg-white"><option value="">-- Pilih --</option><option value="Tidak Sekolah">Tidak Sekolah</option><option value="SD/Sederajat">SD/Sederajat</option><option value="SMP/Sederajat">SMP/Sederajat</option><option value="SMA/Sederajat">SMA/Sederajat</option><option value="D1-D3">D1-D3</option><option value="S1/D4">S1/D4</option><option value="S2/S3">S2/S3</option></select></div>
+                            <div><label class="text-[10px] font-bold text-orange-700 block mb-1 uppercase">Pekerjaan</label><input type="text" id="anak-pek-ibu" placeholder="Opsional" class="border-2 border-orange-200 p-2.5 rounded-lg focus:outline-orange-500 w-full font-medium bg-white"></div>
+                        </div>
+                    </div>
+                    <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-orange-200 pt-4">
+                        <div><label class="text-[10px] font-bold text-orange-700 block mb-1 uppercase">Penghasilan Orang Tua</label><select id="anak-penghasilan" class="border-2 border-orange-200 p-2.5 rounded-lg focus:outline-orange-500 w-full font-medium bg-white"><option value="">-- Pilih --</option><option value="< Rp 1 Juta">< Rp 1 Juta</option><option value="Rp 1 - 3 Juta">Rp 1 - 3 Juta</option><option value="Rp 3 - 5 Juta">Rp 3 - 5 Juta</option><option value="Rp 5 - 10 Juta">Rp 5 - 10 Juta</option><option value="> Rp 10 Juta">> Rp 10 Juta</option></select></div>
+                        <div><label class="text-[10px] font-bold text-orange-700 block mb-1 uppercase">No HP / WA Ortu (Aktif)</label><input type="text" id="anak-nohp-wali" placeholder="Opsional" class="border-2 border-orange-200 p-2.5 rounded-lg focus:outline-orange-500 w-full font-bold bg-white"></div>
+                        <div><label class="text-[10px] font-bold text-orange-700 block mb-1 uppercase">Nama Wali (Jika ikut wali)</label><input type="text" id="anak-wali" placeholder="Opsional" class="border-2 border-orange-200 p-2.5 rounded-lg focus:outline-orange-500 w-full font-medium bg-white"></div>
+                    </div>
+                </div>
+
+                <h3 class="font-bold text-xs text-slate-400 uppercase tracking-wider mb-3"><i class="fa-solid fa-notes-medical mr-2"></i> 5. Bantuan Sosial & Kesehatan</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 bg-rose-50 p-4 rounded-xl border border-rose-100">
+                    <div><label class="text-[10px] font-bold text-rose-700 block mb-1 uppercase">Nomor KIP / PIP</label><input type="text" id="anak-nokip" placeholder="Opsional" class="border-2 border-rose-200 p-2.5 rounded-lg focus:outline-rose-500 w-full font-medium bg-white"></div>
+                    <div><label class="text-[10px] font-bold text-rose-700 block mb-1 uppercase">Nomor PKH / KKS</label><input type="text" id="anak-nopkh" placeholder="Opsional" class="border-2 border-rose-200 p-2.5 rounded-lg focus:outline-rose-500 w-full font-medium bg-white"></div>
+                    <div><label class="text-[10px] font-bold text-rose-700 block mb-1 uppercase">Riwayat Penyakit Tertentu</label><input type="text" id="anak-riwayat-penyakit" placeholder="Opsional, pisahkan koma" class="border-2 border-rose-200 p-2.5 rounded-lg focus:outline-rose-500 w-full font-medium bg-white"></div>
+                </div>
+
+                <div class="flex space-x-3 pt-4 border-t border-slate-100">
                     <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-black shadow-lg transition transform hover:-translate-y-0.5"><i class="fa-solid fa-save mr-2"></i> Simpan Data Siswa</button>
-                    <button type="button" onclick="document.getElementById('form-anak').reset(); document.getElementById('anak-id').value='';" class="bg-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold hidden hover:bg-slate-300 transition" id="btn-batal-anak">Batal Edit</button>
+                    <button type="button" onclick="document.getElementById('form-anak').reset(); document.getElementById('anak-id').value=''; window.toggleTransportasiAnak();" class="bg-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold hidden hover:bg-slate-300 transition" id="btn-batal-anak">Batal Edit</button>
                 </div>
             </form>
         </div>
+        ` : `
+        <div class="bg-blue-50 text-blue-700 p-5 rounded-2xl font-bold border border-blue-200 shadow-sm mb-6 flex items-center">
+            <i class="fa-solid fa-shield-halved text-2xl mr-3"></i> 
+            Mode Hanya Baca: Anda tidak memiliki wewenang untuk menambah atau mengubah Data Anak.
+        </div>
+        `}
 
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
             <table class="w-full text-left text-sm">
                 <thead class="bg-slate-50 text-slate-600 border-b-2">
-                    <tr><th class="p-4 text-center w-12">No</th><th class="p-4">Nama Siswa & NISN</th><th class="p-4 text-center">Kelas</th><th class="p-4 text-center">L/P</th><th class="p-4 text-center">Status</th><th class="p-4 text-center">Aksi</th></tr>
+                    <tr>
+                        <th class="p-4 text-center w-12">No</th>
+                        <th class="p-4">Nama Siswa & Identitas</th>
+                        <th class="p-4 text-center">Kelas</th>
+                        <th class="p-4 text-center">L/P</th>
+                        <th class="p-4 text-center">Status</th>
+                        ${isBolehAksiAnak ? '<th class="p-4 text-center">Aksi</th>' : ''}
+                    </tr>
                 </thead>
-                <tbody>${barisTabel || '<tr><td colspan="6" class="text-center p-8 text-slate-400 font-medium">Belum ada data siswa terdaftar</td></tr>'}</tbody>
+                <tbody>${barisTabel || `<tr><td colspan="${isBolehAksiAnak ? '6' : '5'}" class="text-center p-8 text-slate-400 font-medium">Belum ada data siswa terdaftar</td></tr>`}</tbody>
             </table>
         </div>
     `;
@@ -2097,24 +2321,60 @@ window.simpanAnak = async function(e) {
     const data = {
         nama: document.getElementById('anak-nama').value,
         nisn: document.getElementById('anak-nisn').value,
+        nis: document.getElementById('anak-nis').value,
+        nik: document.getElementById('anak-nik').value,
         jk: document.getElementById('anak-jk').value,
         tempatLahir: document.getElementById('anak-tempat-lahir').value,
         tglLahir: document.getElementById('anak-tgl-lahir').value,
+        agama: document.getElementById('anak-agama').value,
+        golDarah: document.getElementById('anak-goldarah').value,
+        anakKe: document.getElementById('anak-ke').value,
+        jmlSaudara: document.getElementById('anak-jml-saudara').value,
+        
         kelas: document.getElementById('anak-kelas').value,
+        statusAkademik: document.getElementById('anak-status-akademik').value,
+        tahunMasuk: document.getElementById('anak-tahun-masuk').value,
         status: document.getElementById('anak-status').value,
-        asrama: document.getElementById('anak-asrama').value,
-        wali: document.getElementById('anak-wali').value,
+        asalSekolah: document.getElementById('anak-asal-sekolah').value,
+        
+        alamat: document.getElementById('anak-alamat').value,
+        jenisTinggal: document.getElementById('anak-jenis-tinggal').value,
+        asrama: document.getElementById('anak-jenis-tinggal').value === 'Asrama' ? 'Ya' : 'Tidak',
+        transportasi: document.getElementById('anak-transportasi').value,
+        jarak: document.getElementById('anak-jarak').value,
+        
+        namaAyah: document.getElementById('anak-nama-ayah').value,
+        nikAyah: document.getElementById('anak-nik-ayah').value,
+        pendidikanAyah: document.getElementById('anak-pend-ayah').value,
+        pekerjaanAyah: document.getElementById('anak-pek-ayah').value,
+        
+        namaIbu: document.getElementById('anak-nama-ibu').value,
+        nikIbu: document.getElementById('anak-nik-ibu').value,
+        pendidikanIbu: document.getElementById('anak-pend-ibu').value,
+        pekerjaanIbu: document.getElementById('anak-pek-ibu').value,
+        
+        penghasilanOrtu: document.getElementById('anak-penghasilan').value,
         noHpWali: document.getElementById('anak-nohp-wali').value,
-        alamat: document.getElementById('anak-alamat').value
+        wali: document.getElementById('anak-wali').value,
+        
+        noKip: document.getElementById('anak-nokip').value,
+        noPkh: document.getElementById('anak-nopkh').value,
+        riwayatPenyakit: document.getElementById('anak-riwayat-penyakit').value
     };
 
     try {
-        if (id) await updateDoc(doc(db, "Anak", id), data);
-        else await addDoc(collection(db, "Anak"), data);
+        if (id) {
+            data.updatedAt = new Date().toISOString();
+            await updateDoc(doc(db, "Anak", id), data);
+        } else {
+            data.createdAt = new Date().toISOString();
+            await addDoc(collection(db, "Anak"), data);
+        }
         
         document.getElementById('form-anak').reset();
         document.getElementById('anak-id').value = '';
         document.getElementById('btn-batal-anak').classList.add('hidden');
+        window.toggleTransportasiAnak();
     } catch (err) { alert("Gagal menyimpan data!"); }
 };
 
@@ -2124,17 +2384,47 @@ window.editAnak = function(id) {
         document.getElementById('anak-id').value = item.id;
         document.getElementById('anak-nama').value = item.nama || '';
         document.getElementById('anak-nisn').value = item.nisn || '';
+        document.getElementById('anak-nis').value = item.nis || '';
+        document.getElementById('anak-nik').value = item.nik || '';
         document.getElementById('anak-jk').value = item.jk || '';
         document.getElementById('anak-tempat-lahir').value = item.tempatLahir || '';
         document.getElementById('anak-tgl-lahir').value = item.tglLahir || '';
+        document.getElementById('anak-agama').value = item.agama || 'Islam';
+        document.getElementById('anak-goldarah').value = item.golDarah || '';
+        document.getElementById('anak-ke').value = item.anakKe || '';
+        document.getElementById('anak-jml-saudara').value = item.jmlSaudara || '';
+        
         document.getElementById('anak-kelas').value = item.kelas || '';
-        document.getElementById('anak-status').value = item.status || '';
-        document.getElementById('anak-asrama').value = item.asrama || '';
-        document.getElementById('anak-wali').value = item.wali || '';
-        document.getElementById('anak-nohp-wali').value = item.noHpWali || '';
+        document.getElementById('anak-status-akademik').value = item.statusAkademik || 'Aktif';
+        document.getElementById('anak-tahun-masuk').value = item.tahunMasuk || '';
+        document.getElementById('anak-status').value = item.status || 'Reguler';
+        document.getElementById('anak-asal-sekolah').value = item.asalSekolah || '';
+        
         document.getElementById('anak-alamat').value = item.alamat || '';
+        document.getElementById('anak-jenis-tinggal').value = item.jenisTinggal || '';
+        document.getElementById('anak-transportasi').value = item.transportasi || '';
+        document.getElementById('anak-jarak').value = item.jarak || '';
+        
+        document.getElementById('anak-nama-ayah').value = item.namaAyah || '';
+        document.getElementById('anak-nik-ayah').value = item.nikAyah || '';
+        document.getElementById('anak-pend-ayah').value = item.pendidikanAyah || '';
+        document.getElementById('anak-pek-ayah').value = item.pekerjaanAyah || '';
+        
+        document.getElementById('anak-nama-ibu').value = item.namaIbu || '';
+        document.getElementById('anak-nik-ibu').value = item.nikIbu || '';
+        document.getElementById('anak-pend-ibu').value = item.pendidikanIbu || '';
+        document.getElementById('anak-pek-ibu').value = item.pekerjaanIbu || '';
+        
+        document.getElementById('anak-penghasilan').value = item.penghasilanOrtu || '';
+        document.getElementById('anak-nohp-wali').value = item.noHpWali || '';
+        document.getElementById('anak-wali').value = item.wali || '';
+        
+        document.getElementById('anak-nokip').value = item.noKip || '';
+        document.getElementById('anak-nopkh').value = item.noPkh || '';
+        document.getElementById('anak-riwayat-penyakit').value = item.riwayatPenyakit || '';
         
         document.getElementById('btn-batal-anak').classList.remove('hidden');
+        window.toggleTransportasiAnak();
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 };
