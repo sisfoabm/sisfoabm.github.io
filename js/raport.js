@@ -1,302 +1,262 @@
 import { db } from './firebase-init.js';
-import { collection, doc, deleteDoc, getDocs, query, orderBy, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, doc, deleteDoc, getDocs, query, orderBy, setDoc, getDoc, where, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-window.currentRaportTab = 'umum';
-window.raportFilters = { semester: '', siswa: '' };
-
-export async function renderHalamanRaport(container) {
-    const currentUser = window.currentUser || {};
-    
-    // Tarik daftar semester dari kalender akademik (Jika ada) atau generate statis
-    const d = new Date();
-    const currYear = d.getFullYear();
-    const optSemester = `
-        <option value="Ganjil ${currYear}-${currYear+1}">Ganjil ${currYear}-${currYear+1}</option>
-        <option value="Genap ${currYear-1}-${currYear}">Genap ${currYear-1}-${currYear}</option>
-    `;
-
-    // Tarik daftar anak (Siswa Aktif)
-    const anakList = (window.appState.anak || []).filter(a => a.statusAkademik !== 'Lulus');
-    const optAnak = anakList.map(a => `<option value="${a.id}|${a.nama}">${a.nama} (${a.kelas || '-'})</option>`).join('');
-
-    container.innerHTML = `
-        <div class="mb-6 flex overflow-x-auto border-b-4 border-slate-200 gap-2 custom-scrollbar pr-4">
-            <button onclick="window.switchRaportTab('umum')" class="px-6 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'umum' ? 'bg-blue-600 text-white shadow-[0_-5px_15px_rgba(37,99,235,0.3)] border-b-4 border-blue-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-file-lines mr-2"></i> Raport Akademik Umum</button>
-            <button onclick="window.switchRaportTab('tahfidz')" class="px-6 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'tahfidz' ? 'bg-teal-600 text-white shadow-[0_-5px_15px_rgba(13,148,136,0.3)] border-b-4 border-teal-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-book-quran mr-2"></i> Raport Tahfidz & Asrama</button>
-        </div>
-        
-        <div id="raport-content-area" class="animate-fade-in"></div>
-    `;
-
-    if (window.currentRaportTab === 'umum') window.renderRaportUmum(optSemester, optAnak);
-    else window.renderRaportTahfidz(optSemester, optAnak);
-}
-
-window.switchRaportTab = function(tab) {
-    window.currentRaportTab = tab;
-    window.navigate('raport'); // Memanggil ulang render dengan tab yang aktif
-};
+window.currentRaportTab = '';
 
 // ==========================================
-// RAPORT UMUM (AKADEMIK)
+// FUNGSI BANTUAN & KALKULASI OTOMATIS
 // ==========================================
-window.renderRaportUmum = function(optSemester, optAnak) {
-    const area = document.getElementById('raport-content-area');
-    
-    // Input statis Mata Pelajaran Umum jika belum ada di database
-    const mapelDefault = ['Pendidikan Agama Islam', 'Pendidikan Pancasila', 'Bahasa Indonesia', 'Matematika', 'Ilmu Pengetahuan Alam', 'Ilmu Pengetahuan Sosial', 'Bahasa Inggris', 'Pendidikan Jasmani'];
-    let mapelHTML = mapelDefault.map((m, i) => `
-        <div class="grid grid-cols-12 gap-2 mb-2 items-center bg-white p-2 border border-slate-200 rounded-lg raport-mapel-row shadow-sm">
-            <div class="col-span-4 font-bold text-xs text-slate-700 truncate"><input type="text" class="mapel-nama w-full bg-transparent focus:outline-blue-500" value="${m}" required></div>
-            <div class="col-span-2"><input type="number" class="mapel-kkm w-full border p-1.5 rounded text-xs text-center font-bold bg-slate-50 focus:bg-white" placeholder="KKM" value="75" required></div>
-            <div class="col-span-2"><input type="number" class="mapel-nilai w-full border p-1.5 rounded text-xs text-center font-black text-blue-700 bg-blue-50 focus:bg-white" placeholder="Nilai" oninput="window.calcPredikat(this)" required></div>
-            <div class="col-span-3"><input type="text" class="mapel-predikat w-full border p-1.5 rounded text-xs text-center font-black bg-slate-100 cursor-not-allowed uppercase" placeholder="Predikat" readonly></div>
-            <div class="col-span-1 text-center"><button type="button" onclick="this.parentElement.parentElement.remove()" class="text-red-400 hover:text-red-600"><i class="fa-solid fa-times"></i></button></div>
-        </div>
-    `).join('');
-
-    area.innerHTML = `
-        <div class="bg-blue-50 p-6 md:p-8 rounded-2xl shadow-sm mb-6 border-t-4 border-blue-500 relative overflow-hidden">
-            <h2 class="text-xl font-black text-blue-900 mb-6 border-b border-blue-200 pb-4"><i class="fa-solid fa-pen-to-square mr-2 text-blue-500"></i> Pengisian Raport Akademik</h2>
-            <form id="form-raport-umum" onsubmit="window.simpanRaportUmum(event)">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div>
-                        <label class="text-xs font-black text-slate-500 uppercase block mb-1">Tahun Ajaran / Semester</label>
-                        <select id="raport-u-semester" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-blue-900 focus:outline-blue-500 cursor-pointer" required>
-                            <option value="">-- Pilih Semester --</option>${optSemester}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="text-xs font-black text-slate-500 uppercase block mb-1">Pilih Siswa</label>
-                        <select id="raport-u-siswa" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-blue-900 focus:outline-blue-500 cursor-pointer" required>
-                            <option value="">-- Pilih Siswa --</option>${optAnak}
-                        </select>
-                    </div>
-                </div>
-
-                <div class="bg-white/60 border border-white p-4 rounded-xl mb-6 shadow-sm">
-                    <div class="flex justify-between items-center mb-3 border-b border-slate-200 pb-2">
-                        <h3 class="font-black text-slate-700 text-sm"><i class="fa-solid fa-book mr-1"></i> Nilai Mata Pelajaran</h3>
-                        <button type="button" onclick="window.tambahMapelRaport()" class="bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm"><i class="fa-solid fa-plus mr-1"></i> Tambah Mapel</button>
-                    </div>
-                    <div class="grid grid-cols-12 gap-2 mb-2 px-2">
-                        <div class="col-span-4 text-[10px] font-black text-slate-400 uppercase tracking-wider">Mata Pelajaran</div>
-                        <div class="col-span-2 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center">KKM</div>
-                        <div class="col-span-2 text-[10px] font-black text-blue-600 uppercase tracking-wider text-center">Nilai Akhir</div>
-                        <div class="col-span-3 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center">Predikat</div>
-                        <div class="col-span-1 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center">Aksi</div>
-                    </div>
-                    <div id="wadah-mapel-raport" class="max-h-64 overflow-y-auto custom-scrollbar p-1">
-                        ${mapelHTML}
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div class="bg-white/60 border border-white p-4 rounded-xl shadow-sm">
-                        <h3 class="font-black text-slate-700 text-sm mb-3 border-b border-slate-200 pb-2"><i class="fa-solid fa-fingerprint mr-1"></i> Kehadiran (Otomatis dari Sistem)</h3>
-                        <div class="grid grid-cols-3 gap-3">
-                            <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Sakit</label><input type="number" id="raport-u-sakit" value="0" class="w-full border p-2 rounded-lg text-sm font-bold text-center"></div>
-                            <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Izin</label><input type="number" id="raport-u-izin" value="0" class="w-full border p-2 rounded-lg text-sm font-bold text-center"></div>
-                            <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Alpa</label><input type="number" id="raport-u-alpa" value="0" class="w-full border p-2 rounded-lg text-sm font-bold text-center"></div>
-                        </div>
-                        <p class="text-[9px] text-slate-500 font-bold mt-2"><i class="fa-solid fa-info-circle mr-1 text-blue-500"></i> Nilai ini bisa diedit manual jika diperlukan.</p>
-                    </div>
-                    <div class="bg-white/60 border border-white p-4 rounded-xl shadow-sm">
-                        <h3 class="font-black text-slate-700 text-sm mb-3 border-b border-slate-200 pb-2"><i class="fa-solid fa-comment-dots mr-1"></i> Catatan Wali Kelas</h3>
-                        <textarea id="raport-u-catatan" rows="3" placeholder="Tuliskan catatan perkembangan dan motivasi untuk siswa..." class="w-full border p-3 rounded-xl text-xs font-medium focus:outline-blue-500 bg-white" required></textarea>
-                    </div>
-                </div>
-
-                <button type="submit" id="btn-simpan-raport-u" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black px-8 py-4 rounded-xl shadow-lg transition transform hover:-translate-y-1 text-lg"><i class="fa-solid fa-save mr-2"></i> Simpan Raport Akademik</button>
-            </form>
-        </div>
-
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
-            <div class="p-5 bg-slate-50 border-b border-slate-200 font-black text-slate-700 flex justify-between items-center">
-                <span><i class="fa-solid fa-table-list mr-2"></i> Arsip Raport Akademik Umum</span>
-                <button onclick="window.loadDataRaportUmum()" class="text-xs bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm hover:bg-slate-100 transition"><i class="fa-solid fa-sync mr-1"></i> Refresh</button>
-            </div>
-            <div class="overflow-x-auto p-4 custom-scrollbar">
-                <table class="w-full text-left text-sm whitespace-nowrap">
-                    <thead class="bg-slate-100 text-slate-600 border-b-2 border-slate-200">
-                        <tr><th class="p-3">Semester</th><th class="p-3">Nama Siswa</th><th class="p-3 text-center">Rata-Rata Nilai</th><th class="p-3">Wali Kelas</th><th class="p-3 text-center">Aksi Dokumen</th></tr>
-                    </thead>
-                    <tbody id="tbody-raport-umum"><tr><td colspan="5" class="text-center p-8 text-slate-400 font-bold"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Memuat data...</td></tr></tbody>
-                </table>
-            </div>
-        </div>
-    `;
-
-    window.loadDataRaportUmum();
+window.getSemesterFromBulan = function(bulanStr) {
+    if(!bulanStr) return "Semester Belum Ditentukan";
+    const [y, m] = bulanStr.split('-').map(Number);
+    let sem = (m >= 7 && m <= 12) ? 'Ganjil' : 'Genap';
+    let tapel = (m >= 7 && m <= 12) ? `${y}/${y+1}` : `${y-1}/${y}`;
+    return `Semester ${sem} - TA ${tapel}`;
 };
 
 window.calcPredikat = function(inputEl) {
     const val = Number(inputEl.value);
+    let pred = ''; let cls = '';
+    if (val >= 90) { pred = 'A (Sangat Baik)'; cls = 'bg-emerald-100 text-emerald-700'; }
+    else if (val >= 80) { pred = 'B (Baik)'; cls = 'bg-blue-100 text-blue-700'; }
+    else if (val >= 70) { pred = 'C (Cukup)'; cls = 'bg-amber-100 text-amber-700'; }
+    else { pred = 'D (Kurang)'; cls = 'bg-rose-100 text-rose-700'; }
+    
     const row = inputEl.closest('.raport-mapel-row');
-    const predEl = row.querySelector('.mapel-predikat');
-    
-    if (val >= 90) { predEl.value = 'A (Sangat Baik)'; predEl.className = "mapel-predikat w-full border p-1.5 rounded text-xs text-center font-black bg-emerald-100 text-emerald-700 cursor-not-allowed"; }
-    else if (val >= 80) { predEl.value = 'B (Baik)'; predEl.className = "mapel-predikat w-full border p-1.5 rounded text-xs text-center font-black bg-blue-100 text-blue-700 cursor-not-allowed"; }
-    else if (val >= 70) { predEl.value = 'C (Cukup)'; predEl.className = "mapel-predikat w-full border p-1.5 rounded text-xs text-center font-black bg-amber-100 text-amber-700 cursor-not-allowed"; }
-    else { predEl.value = 'D (Kurang)'; predEl.className = "mapel-predikat w-full border p-1.5 rounded text-xs text-center font-black bg-rose-100 text-rose-700 cursor-not-allowed"; }
-};
-
-window.tambahMapelRaport = function() {
-    const div = document.createElement('div');
-    div.className = "grid grid-cols-12 gap-2 mb-2 items-center bg-white p-2 border border-slate-200 rounded-lg raport-mapel-row shadow-sm animate-fade-in";
-    div.innerHTML = `
-        <div class="col-span-4 font-bold text-xs text-slate-700 truncate"><input type="text" class="mapel-nama w-full bg-slate-50 p-1.5 border rounded focus:outline-blue-500" placeholder="Nama Mapel Baru" required></div>
-        <div class="col-span-2"><input type="number" class="mapel-kkm w-full border p-1.5 rounded text-xs text-center font-bold bg-slate-50 focus:bg-white" placeholder="KKM" value="75" required></div>
-        <div class="col-span-2"><input type="number" class="mapel-nilai w-full border p-1.5 rounded text-xs text-center font-black text-blue-700 bg-blue-50 focus:bg-white" placeholder="Nilai" oninput="window.calcPredikat(this)" required></div>
-        <div class="col-span-3"><input type="text" class="mapel-predikat w-full border p-1.5 rounded text-xs text-center font-black bg-slate-100 cursor-not-allowed uppercase" placeholder="Predikat" readonly></div>
-        <div class="col-span-1 text-center"><button type="button" onclick="this.parentElement.parentElement.remove()" class="text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded"><i class="fa-solid fa-trash"></i></button></div>
-    `;
-    document.getElementById('wadah-mapel-raport').appendChild(div);
-};
-
-window.simpanRaportUmum = async function(e) {
-    e.preventDefault();
-    const btn = document.getElementById('btn-simpan-raport-u');
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Menyimpan...'; btn.disabled = true;
-
-    const semester = document.getElementById('raport-u-semester').value;
-    const siswaVal = document.getElementById('raport-u-siswa').value.split('|');
-    const idSiswa = siswaVal[0];
-    const namaSiswa = siswaVal[1];
-
-    let nilaiMapel = [];
-    let totalNilai = 0;
-    document.querySelectorAll('.raport-mapel-row').forEach(row => {
-        const nama = row.querySelector('.mapel-nama').value;
-        const kkm = Number(row.querySelector('.mapel-kkm').value);
-        const nilai = Number(row.querySelector('.mapel-nilai').value);
-        const predikat = row.querySelector('.mapel-predikat').value;
-        if(nama && nilai) {
-            nilaiMapel.push({ nama, kkm, nilai, predikat });
-            totalNilai += nilai;
-        }
-    });
-
-    const rataRata = nilaiMapel.length > 0 ? (totalNilai / nilaiMapel.length).toFixed(1) : 0;
-
-    const dataRaport = {
-        jenis: 'Umum',
-        semester: semester,
-        idSiswa: idSiswa,
-        namaSiswa: namaSiswa,
-        kelas: (window.appState.anak.find(a=>a.id===idSiswa)||{}).kelas || '-',
-        nilaiMapel: nilaiMapel,
-        rataRata: rataRata,
-        kehadiran: {
-            sakit: document.getElementById('raport-u-sakit').value,
-            izin: document.getElementById('raport-u-izin').value,
-            alpa: document.getElementById('raport-u-alpa').value,
-        },
-        catatan: document.getElementById('raport-u-catatan').value,
-        waliKelas: window.currentUser.nama,
-        updatedAt: new Date().toISOString()
-    };
-
-    try {
-        // Menggunakan Composite ID agar Raport tidak ganda di semester yang sama
-        const docId = `RUmum_${idSiswa}_${semester.replace(/\s+/g, '')}`;
-        await setDoc(doc(db, "Raport", docId), dataRaport);
-        
-        alert("Raport Akademik Umum Berhasil Disimpan!");
-        document.getElementById('form-raport-umum').reset();
-        window.loadDataRaportUmum();
-    } catch(err) { alert("Gagal menyimpan raport: " + err.message); }
-    
-    btn.innerHTML = '<i class="fa-solid fa-save mr-2"></i> Simpan Raport Akademik'; btn.disabled = false;
-};
-
-window.loadDataRaportUmum = async function() {
-    const tbody = document.getElementById('tbody-raport-umum');
-    if(!tbody) return;
-
-    try {
-        const q = query(collection(db, "Raport"), orderBy("updatedAt", "desc"));
-        const snap = await getDocs(q);
-        let html = '';
-        snap.forEach(d => {
-            const item = d.data();
-            if(item.jenis !== 'Umum') return;
-
-            let warnaRata = item.rataRata >= 80 ? 'text-emerald-600 bg-emerald-50' : (item.rataRata >= 70 ? 'text-blue-600 bg-blue-50' : 'text-rose-600 bg-rose-50');
-
-            html += `
-            <tr class="border-b border-slate-100 hover:bg-slate-50 transition">
-                <td class="p-3 font-bold text-slate-500">${item.semester}</td>
-                <td class="p-3 font-black text-slate-800">${item.namaSiswa} <span class="text-[9px] bg-slate-200 text-slate-600 px-1.5 rounded ml-1">Kls ${item.kelas}</span></td>
-                <td class="p-3 text-center"><span class="font-black px-3 py-1 rounded-lg border shadow-sm ${warnaRata}">${item.rataRata}</span></td>
-                <td class="p-3 text-xs font-bold text-slate-500">${item.waliKelas}</td>
-                <td class="p-3 text-center">
-                    <button onclick="window.cetakRaportPDF('${d.id}', 'Umum')" class="bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white px-3 py-1.5 rounded-lg transition font-bold text-xs shadow-sm mr-1"><i class="fa-solid fa-print"></i> Cetak PDF</button>
-                    <button onclick="window.hapusRaport('${d.id}')" class="bg-red-50 hover:bg-red-500 text-red-500 hover:text-white px-2 py-1.5 rounded-lg transition font-bold text-xs shadow-sm"><i class="fa-solid fa-trash"></i></button>
-                </td>
-            </tr>`;
-        });
-        tbody.innerHTML = html || '<tr><td colspan="5" class="text-center p-8 text-slate-400 font-medium">Belum ada arsip raport umum.</td></tr>';
-    } catch(e) { tbody.innerHTML = '<tr><td colspan="5" class="text-center p-8 text-red-500 font-bold">Gagal memuat data.</td></tr>'; }
-};
-
-window.hapusRaport = async function(id) {
-    if(confirm("Yakin ingin menghapus dokumen raport ini secara permanen?")) {
-        try { await deleteDoc(doc(db, "Raport", id)); window.loadDataRaportUmum(); } catch(e) { alert("Gagal menghapus!"); }
+    if (row) {
+        const pEl = row.querySelector('.mapel-predikat');
+        if(pEl) { pEl.value = pred; pEl.className = `mapel-predikat w-full border p-1.5 rounded text-xs text-center font-black cursor-not-allowed ${cls}`; }
     }
 };
 
 // ==========================================
-// RAPORT TAHFIDZ & KEPENGASUHAN
+// INISIALISASI & FILTER HAK AKSES
 // ==========================================
-import { getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"; // Memastikan modul penarikan query tersedia
+export async function renderHalamanRaport(container) {
+    const currentUser = window.currentUser || {};
+    const isSA_Admin = ['Super Admin', 'Administrator'].includes(currentUser.hakAkses);
+    const isTU = currentUser.hakAkses === 'Operator/TU';
+    const isWaliKelas = (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('wali kelas'));
+    const isGuru = (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('guru'));
+    const isMusyrif = (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('pengasuh') || j.namaJabatan.toLowerCase().includes('musyrif') || j.namaJabatan.toLowerCase().includes('tahfidz'));
 
-window.renderRaportTahfidz = function(optSemester, optAnak) {
+    const canInputMapel = isGuru || isSA_Admin || isTU;
+    const canInputTahfidz = isMusyrif || isSA_Admin || isTU;
+    const canPreview = isWaliKelas || isSA_Admin || isTU;
+    const canArsip = isSA_Admin || isTU;
+
+    // Tetapkan Tab Default Berdasarkan Akses
+    if (!['input_mapel','input_tahfidz','preview','arsip'].includes(window.currentRaportTab)) {
+        if (canInputMapel) window.currentRaportTab = 'input_mapel';
+        else if (canInputTahfidz) window.currentRaportTab = 'input_tahfidz';
+        else if (canPreview) window.currentRaportTab = 'preview';
+        else if (canArsip) window.currentRaportTab = 'arsip';
+    }
+
+    let tabs = '';
+    if (canInputMapel) tabs += `<button onclick="window.switchRaportTab('input_mapel')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'input_mapel' ? 'bg-blue-600 text-white border-b-4 border-blue-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-pen-nib mr-2"></i> Input Nilai Mapel (Guru)</button>`;
+    if (canInputTahfidz) tabs += `<button onclick="window.switchRaportTab('input_tahfidz')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'input_tahfidz' ? 'bg-teal-600 text-white border-b-4 border-teal-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-book-quran mr-2"></i> Input Raport Tahfidz</button>`;
+    if (canPreview) tabs += `<button onclick="window.switchRaportTab('preview')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'preview' ? 'bg-indigo-600 text-white border-b-4 border-indigo-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-file-signature mr-2"></i> Preview & Cetak (Wali Kelas)</button>`;
+    if (canArsip) tabs += `<button onclick="window.switchRaportTab('arsip')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'arsip' ? 'bg-slate-800 text-white border-b-4 border-slate-800 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-box-archive mr-2"></i> Arsip Raport (Admin)</button>`;
+
+    container.innerHTML = `
+        <div class="mb-6 flex overflow-x-auto border-b-4 border-slate-200 gap-2 custom-scrollbar pr-4">${tabs}</div>
+        <div id="raport-content-area" class="animate-fade-in"></div>
+    `;
+
+    if (window.currentRaportTab === 'input_mapel') window.renderInputMapel();
+    else if (window.currentRaportTab === 'input_tahfidz') window.renderInputTahfidz();
+    else if (window.currentRaportTab === 'preview') window.renderPreviewRaport();
+    else if (window.currentRaportTab === 'arsip') window.renderArsipRaport();
+}
+
+window.switchRaportTab = function(tab) {
+    window.currentRaportTab = tab; window.navigate('raport');
+};
+
+// ==========================================
+// TAB 1: INPUT NILAI MAPEL (GURU)
+// ==========================================
+window.toggleBulkInputMapel = function() {
+    const isBulk = document.getElementById('mapel-mode-bulk').checked;
+    if(isBulk) {
+        document.getElementById('mapel-single-area').classList.add('hidden');
+        document.getElementById('mapel-bulk-area').classList.remove('hidden');
+    } else {
+        document.getElementById('mapel-single-area').classList.remove('hidden');
+        document.getElementById('mapel-bulk-area').classList.add('hidden');
+    }
+};
+
+window.renderInputMapel = function() {
     const area = document.getElementById('raport-content-area');
+    const anakList = (window.appState.anak || []).filter(a => a.statusAkademik !== 'Lulus').sort((a,b) => (a.nama||'').localeCompare(b.nama||''));
+    const optAnak = anakList.map(a => `<option value="${a.id}|${a.nama}">${a.nama} (${a.kelas || '-'})</option>`).join('');
     
+    const mapelDefault = ['Pendidikan Agama Islam', 'Pendidikan Pancasila', 'Bahasa Indonesia', 'Matematika', 'Ilmu Pengetahuan Alam', 'Ilmu Pengetahuan Sosial', 'Bahasa Inggris', 'Pendidikan Jasmani', 'Seni Budaya', 'Prakarya', 'Muatan Lokal'];
+    const optMapel = mapelDefault.map(m => `<option value="${m}">${m}</option>`).join('');
+
+    const bulkRows = anakList.map((a, i) => `
+        <tr data-id="${a.id}" data-nama="${a.nama}" class="border-b border-slate-200 hover:bg-slate-50 transition raport-mapel-row">
+            <td class="p-2 text-center font-bold text-slate-500">${i+1}</td>
+            <td class="p-2 font-black text-slate-800">${a.nama}</td>
+            <td class="p-2 bg-blue-50/30"><input type="number" class="mapel-kkm w-full border border-blue-200 p-1.5 rounded text-xs text-center font-bold bg-white" placeholder="KKM" value="75"></td>
+            <td class="p-2 bg-blue-50/30"><input type="number" class="mapel-nilai w-full border border-blue-200 p-1.5 rounded text-xs text-center font-black text-blue-700 bg-white" placeholder="Nilai" oninput="window.calcPredikat(this)"></td>
+            <td class="p-2 bg-blue-50/30"><input type="text" class="mapel-predikat w-full border border-blue-200 p-1.5 rounded text-xs text-center font-black bg-slate-100 text-slate-400 cursor-not-allowed" placeholder="Otomatis" readonly></td>
+        </tr>
+    `).join('');
+
     area.innerHTML = `
-        <div class="bg-teal-50 p-6 md:p-8 rounded-2xl shadow-sm mb-6 border-t-4 border-teal-500 relative overflow-hidden">
-            <h2 class="text-xl font-black text-teal-900 mb-6 border-b border-teal-200 pb-4"><i class="fa-solid fa-book-quran mr-2 text-teal-500"></i> Pengisian Raport Tahfidz & Kepengasuhan</h2>
-            <form id="form-raport-tahfidz" onsubmit="window.simpanRaportTahfidz(event)">
+        <div class="bg-blue-50 p-6 md:p-8 rounded-2xl shadow-sm mb-6 border-t-4 border-blue-500 relative overflow-hidden">
+            <div class="flex justify-between items-center mb-6 border-b border-blue-200 pb-4">
+                <h2 class="text-xl font-black text-blue-900"><i class="fa-solid fa-pen-nib mr-2 text-blue-500"></i> Setor Nilai Mata Pelajaran</h2>
+                <label class="flex items-center cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-100 transition shadow-sm">
+                    <input type="checkbox" id="mapel-mode-bulk" onchange="window.toggleBulkInputMapel()" class="mr-2 w-4 h-4 text-blue-600 rounded">
+                    <span class="text-xs font-bold text-blue-800">Input Massal (Tabel Kelas)</span>
+                </label>
+            </div>
+            
+            <form id="form-input-mapel" onsubmit="window.simpanInputMapel(event)">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div>
-                        <label class="text-xs font-black text-slate-500 uppercase block mb-1">Tahun Ajaran / Semester</label>
-                        <select id="raport-t-semester" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-teal-900 focus:outline-teal-500 cursor-pointer" required>
-                            <option value="">-- Pilih Semester --</option>${optSemester}
+                        <label class="text-xs font-black text-slate-500 uppercase block mb-1">Bulan & Tahun Evaluasi</label>
+                        <input type="month" id="mapel-bulan" onchange="document.getElementById('lbl-semester-mapel').innerText = window.getSemesterFromBulan(this.value)" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-blue-900 focus:outline-blue-500 bg-white" required>
+                        <p class="text-[10px] font-black text-blue-600 mt-1" id="lbl-semester-mapel">Pilih Bulan Terlebih Dahulu</p>
+                    </div>
+                    <div>
+                        <label class="text-xs font-black text-slate-500 uppercase block mb-1">Pilih Mata Pelajaran (Yang Anda Ampu)</label>
+                        <select id="mapel-nama" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-blue-900 focus:outline-blue-500 bg-white" required>
+                            <option value="">-- Pilih Mapel --</option>${optMapel}
                         </select>
+                    </div>
+                </div>
+
+                <div id="mapel-single-area" class="bg-white/60 p-4 rounded-xl shadow-sm border border-white mb-6 raport-mapel-row">
+                    <label class="text-xs font-black text-slate-500 uppercase block mb-2">Target Siswa</label>
+                    <select id="mapel-siswa-single" class="w-full border-2 border-blue-100 p-3 rounded-xl font-bold text-blue-900 focus:outline-blue-500 bg-white mb-4">
+                        <option value="">-- Pilih Satu Siswa --</option>${optAnak}
+                    </select>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div><label class="text-[10px] font-bold text-slate-500 uppercase block">KKM</label><input type="number" id="mapel-kkm-single" class="mapel-kkm w-full border-2 p-2.5 rounded-lg text-sm font-bold text-center" value="75"></div>
+                        <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Nilai Akhir</label><input type="number" id="mapel-nilai-single" class="mapel-nilai w-full border-2 border-blue-300 p-2.5 rounded-lg text-sm font-black text-blue-700 bg-blue-50 text-center" oninput="window.calcPredikat(this)"></div>
+                        <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Predikat</label><input type="text" id="mapel-predikat-single" class="mapel-predikat w-full border-2 p-2.5 rounded-lg text-sm font-black bg-slate-100 text-center cursor-not-allowed" readonly></div>
+                    </div>
+                </div>
+
+                <div id="mapel-bulk-area" class="hidden bg-white border border-slate-200 p-2 rounded-xl shadow-inner mb-6 overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left text-sm whitespace-nowrap min-w-[600px]">
+                        <thead>
+                            <tr class="bg-blue-100 border-b border-blue-200">
+                                <th class="p-3 text-center text-xs font-black text-blue-800 w-12">No</th>
+                                <th class="p-3 text-xs font-black text-blue-800">Nama Siswa</th>
+                                <th class="p-3 text-center text-xs font-black text-blue-800 w-24">KKM</th>
+                                <th class="p-3 text-center text-xs font-black text-blue-800 w-24">Nilai</th>
+                                <th class="p-3 text-center text-xs font-black text-blue-800 w-32">Predikat</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-mapel-bulk">${bulkRows || '<tr><td colspan="5" class="text-center text-slate-400 p-4 font-bold">Tidak ada siswa aktif.</td></tr>'}</tbody>
+                    </table>
+                    <p class="text-[10px] text-slate-400 mt-2 font-bold text-center"><i class="fa-solid fa-circle-info mr-1"></i> Biarkan kosong nilai santri yang tidak mengikuti ujian. Sistem hanya menyimpan baris yang diisi nilainya.</p>
+                </div>
+
+                <button type="submit" id="btn-simpan-input-mapel" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-black px-10 py-4 rounded-xl shadow-lg transition transform hover:-translate-y-1 text-lg float-right"><i class="fa-solid fa-paper-plane mr-2"></i> Setor Nilai</button>
+                <div class="clear-both"></div>
+            </form>
+        </div>
+    `;
+};
+
+window.simpanInputMapel = async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-simpan-input-mapel'); btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Menyimpan...'; btn.disabled = true;
+
+    const bulan = document.getElementById('mapel-bulan').value;
+    const mapel = document.getElementById('mapel-nama').value;
+    const isBulk = document.getElementById('mapel-mode-bulk').checked;
+    let payloads = [];
+
+    if (isBulk) {
+        document.querySelectorAll('#tbody-mapel-bulk tr').forEach(tr => {
+            const idSiswa = tr.dataset.id; const namaSiswa = tr.dataset.nama;
+            const kkm = Number(tr.querySelector('.mapel-kkm').value);
+            const nilai = Number(tr.querySelector('.mapel-nilai').value);
+            const predikat = tr.querySelector('.mapel-predikat').value;
+            if(nilai > 0) payloads.push({ idSiswa, namaSiswa, bulan, mapel, kkm, nilai, predikat, guru: window.currentUser.nama, updatedAt: new Date().toISOString() });
+        });
+    } else {
+        const sVal = document.getElementById('mapel-siswa-single').value;
+        if(!sVal) { alert("Pilih siswa terlebih dahulu!"); btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Setor Nilai'; btn.disabled = false; return; }
+        const [idSiswa, namaSiswa] = sVal.split('|');
+        const kkm = Number(document.getElementById('mapel-kkm-single').value);
+        const nilai = Number(document.getElementById('mapel-nilai-single').value);
+        const predikat = document.getElementById('mapel-predikat-single').value;
+        if(nilai > 0) payloads.push({ idSiswa, namaSiswa, bulan, mapel, kkm, nilai, predikat, guru: window.currentUser.nama, updatedAt: new Date().toISOString() });
+    }
+
+    if(payloads.length === 0) { alert("Tidak ada nilai valid yang dimasukkan."); btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Setor Nilai'; btn.disabled = false; return; }
+
+    try {
+        const batch = writeBatch(db);
+        payloads.forEach(p => {
+            const docId = `NM_${p.idSiswa}_${p.mapel.replace(/\s+/g,'')}_${p.bulan}`;
+            batch.set(doc(db, "NilaiMapel", docId), p);
+        });
+        await batch.commit();
+        alert(`Berhasil menyetor nilai untuk ${payloads.length} siswa.`);
+        document.getElementById('form-input-mapel').reset();
+        document.getElementById('lbl-semester-mapel').innerText = "Pilih Bulan Terlebih Dahulu";
+    } catch(err) { alert("Gagal menyetor nilai: " + err.message); }
+    
+    btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Setor Nilai'; btn.disabled = false;
+};
+
+// ==========================================
+// TAB 2: INPUT TAHFIDZ & ASRAMA (MUSYRIF)
+// ==========================================
+window.renderInputTahfidz = function() {
+    const area = document.getElementById('raport-content-area');
+    const optAnak = (window.appState.anak || []).filter(a => a.statusAkademik !== 'Lulus').sort((a,b) => (a.nama||'').localeCompare(b.nama||'')).map(a => `<option value="${a.id}|${a.nama}">${a.nama} (${a.kelas || '-'})</option>`).join('');
+
+    area.innerHTML = `
+        <div class="bg-teal-50 p-6 md:p-8 rounded-2xl shadow-sm mb-6 border-t-4 border-teal-500 relative overflow-hidden">
+            <h2 class="text-xl font-black text-teal-900 mb-6 border-b border-teal-200 pb-4"><i class="fa-solid fa-book-quran mr-2 text-teal-500"></i> Setor Nilai Tahfidz & Kepengasuhan</h2>
+            <form id="form-input-tahfidz" onsubmit="window.simpanInputTahfidz(event)">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label class="text-xs font-black text-slate-500 uppercase block mb-1">Bulan & Tahun Evaluasi</label>
+                        <input type="month" id="tahfidz-bulan" onchange="document.getElementById('lbl-semester-tahfidz').innerText = window.getSemesterFromBulan(this.value); window.tarikDataAutoSantri();" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-teal-900 focus:outline-teal-500 bg-white" required>
+                        <p class="text-[10px] font-black text-teal-600 mt-1" id="lbl-semester-tahfidz">Pilih Bulan Terlebih Dahulu</p>
                     </div>
                     <div>
                         <label class="text-xs font-black text-slate-500 uppercase block mb-1">Pilih Siswa / Santri</label>
-                        <select id="raport-t-siswa" onchange="window.tarikDataAutoSantri(this.value)" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-teal-900 focus:outline-teal-500 cursor-pointer" required>
+                        <select id="tahfidz-siswa" onchange="window.tarikDataAutoSantri()" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-teal-900 focus:outline-teal-500 bg-white cursor-pointer" required>
                             <option value="">-- Pilih Siswa --</option>${optAnak}
                         </select>
-                        <p class="text-[9px] text-teal-600 font-bold mt-1"><i class="fa-solid fa-bolt mr-1 text-yellow-500"></i> Memilih siswa akan otomatis menarik rata-rata nilai Tahfidz & Poin Asrama.</p>
+                        <p class="text-[9px] text-teal-600 font-bold mt-1"><i class="fa-solid fa-bolt mr-1 text-yellow-500"></i> Memilih siswa & bulan otomatis menarik rata-rata Tahfidz & Poin Asrama.</p>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <!-- Blok Tahfidz -->
                     <div class="bg-white/60 border border-white p-4 rounded-xl shadow-sm">
                         <h3 class="font-black text-slate-700 text-sm mb-3 border-b border-slate-200 pb-2"><i class="fa-solid fa-book-open-reader mr-1 text-teal-600"></i> Capaian Tahfidz</h3>
                         <div class="space-y-3">
-                            <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Capaian Hafalan Terakhir (Cth: Juz 30, An-Naba)</label><input type="text" id="raport-t-capaian" placeholder="Juz ..., Surah ..." class="w-full border-2 p-2.5 rounded-lg text-sm font-bold focus:outline-teal-500 bg-white border-slate-200" required></div>
+                            <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Capaian Hafalan Terakhir (Cth: Juz 30, An-Naba)</label><input type="text" id="tahfidz-capaian" placeholder="Juz ..., Surah ..." class="w-full border-2 p-2.5 rounded-lg text-sm font-bold focus:outline-teal-500 bg-white border-slate-200" required></div>
                             <div class="grid grid-cols-2 gap-3">
-                                <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Rata-rata Ziyadah</label><input type="number" step="0.1" id="raport-t-ziyadah" value="0" class="w-full border-2 border-teal-200 p-2 rounded-lg text-sm font-black text-center text-teal-700 bg-teal-50 focus:outline-teal-500"></div>
-                                <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Rata-rata Muraja'ah</label><input type="number" step="0.1" id="raport-t-murajaah" value="0" class="w-full border-2 border-amber-200 p-2 rounded-lg text-sm font-black text-center text-amber-700 bg-amber-50 focus:outline-amber-500"></div>
+                                <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Rata-rata Ziyadah</label><input type="number" step="0.1" id="tahfidz-ziyadah" value="0" class="w-full border-2 border-teal-200 p-2 rounded-lg text-sm font-black text-center text-teal-700 bg-teal-50 focus:outline-teal-500"></div>
+                                <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Rata-rata Muraja'ah</label><input type="number" step="0.1" id="tahfidz-murajaah" value="0" class="w-full border-2 border-amber-200 p-2 rounded-lg text-sm font-black text-center text-amber-700 bg-amber-50 focus:outline-amber-500"></div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Blok Kepengasuhan -->
                     <div class="bg-white/60 border border-white p-4 rounded-xl shadow-sm">
                         <h3 class="font-black text-slate-700 text-sm mb-3 border-b border-slate-200 pb-2"><i class="fa-solid fa-bed mr-1 text-teal-600"></i> Kepengasuhan & Akhlaq</h3>
                         <div class="space-y-3">
                             <div class="grid grid-cols-2 gap-3">
-                                <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Total Poin Pelanggaran</label><input type="number" id="raport-t-pelanggaran" value="0" class="w-full border-2 border-rose-200 p-2 rounded-lg text-sm font-black text-center text-rose-600 bg-rose-50 focus:outline-rose-500"></div>
-                                <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Total Poin Prestasi</label><input type="number" id="raport-t-prestasi" value="0" class="w-full border-2 border-emerald-200 p-2 rounded-lg text-sm font-black text-center text-emerald-600 bg-emerald-50 focus:outline-emerald-500"></div>
+                                <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Total Poin Pelanggaran</label><input type="number" id="tahfidz-pelanggaran" value="0" class="w-full border-2 border-rose-200 p-2 rounded-lg text-sm font-black text-center text-rose-600 bg-rose-50 focus:outline-rose-500"></div>
+                                <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Total Poin Prestasi</label><input type="number" id="tahfidz-prestasi" value="0" class="w-full border-2 border-emerald-200 p-2 rounded-lg text-sm font-black text-center text-emerald-600 bg-emerald-50 focus:outline-emerald-500"></div>
                             </div>
                             <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Predikat Akhlaq / Adab</label>
-                                <select id="raport-t-akhlaq" class="w-full border-2 border-slate-200 p-2.5 rounded-lg text-sm font-bold focus:outline-teal-500 bg-white cursor-pointer" required>
+                                <select id="tahfidz-akhlaq" class="w-full border-2 border-slate-200 p-2.5 rounded-lg text-sm font-bold focus:outline-teal-500 bg-white cursor-pointer" required>
                                     <option value="A (Sangat Baik)">A (Sangat Baik)</option>
                                     <option value="B (Baik)" selected>B (Baik)</option>
                                     <option value="C (Cukup)">C (Cukup)</option>
@@ -307,151 +267,292 @@ window.renderRaportTahfidz = function(optSemester, optAnak) {
                     </div>
                 </div>
                 
-                <div class="bg-white/60 border border-white p-4 rounded-xl shadow-sm mb-6">
-                    <h3 class="font-black text-slate-700 text-sm mb-3 border-b border-slate-200 pb-2"><i class="fa-solid fa-comment-dots mr-1 text-teal-600"></i> Catatan Musyrif / Pengasuh</h3>
-                    <textarea id="raport-t-catatan" rows="3" placeholder="Tuliskan catatan perkembangan hafalan dan adab santri di asrama..." class="w-full border-2 border-slate-200 p-3 rounded-xl text-xs font-medium focus:outline-teal-500 bg-white" required></textarea>
-                </div>
-
-                <button type="submit" id="btn-simpan-raport-t" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-black px-8 py-4 rounded-xl shadow-lg transition transform hover:-translate-y-1 text-lg"><i class="fa-solid fa-save mr-2"></i> Simpan Raport Tahfidz & Asrama</button>
+                <button type="submit" id="btn-simpan-input-tahfidz" class="w-full md:w-auto bg-teal-600 hover:bg-teal-700 text-white font-black px-10 py-4 rounded-xl shadow-lg transition transform hover:-translate-y-1 text-lg float-right"><i class="fa-solid fa-paper-plane mr-2"></i> Setor Nilai Tahfidz</button>
+                <div class="clear-both"></div>
             </form>
         </div>
-
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
-            <div class="p-5 bg-slate-50 border-b border-slate-200 font-black text-slate-700 flex justify-between items-center">
-                <span><i class="fa-solid fa-table-list mr-2"></i> Arsip Raport Tahfidz & Asrama</span>
-                <button onclick="window.loadDataRaportTahfidz()" class="text-xs bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm hover:bg-slate-100 transition"><i class="fa-solid fa-sync mr-1"></i> Refresh</button>
-            </div>
-            <div class="overflow-x-auto p-4 custom-scrollbar">
-                <table class="w-full text-left text-sm whitespace-nowrap">
-                    <thead class="bg-slate-100 text-slate-600 border-b-2 border-slate-200">
-                        <tr><th class="p-3">Semester</th><th class="p-3">Nama Santri</th><th class="p-3">Capaian Hafalan</th><th class="p-3 text-center">Akhlaq</th><th class="p-3">Musyrif</th><th class="p-3 text-center">Aksi Dokumen</th></tr>
-                    </thead>
-                    <tbody id="tbody-raport-tahfidz"><tr><td colspan="6" class="text-center p-8 text-slate-400 font-bold"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Memuat data...</td></tr></tbody>
-                </table>
-            </div>
-        </div>
     `;
-    window.loadDataRaportTahfidz();
 };
 
-window.tarikDataAutoSantri = async function(val) {
-    if(!val) return;
-    const [idSiswa, namaSiswa] = val.split('|');
+window.tarikDataAutoSantri = async function() {
+    const sVal = document.getElementById('tahfidz-siswa').value;
+    const bVal = document.getElementById('tahfidz-bulan').value;
+    if(!sVal || !bVal) return;
+    const [idSiswa, namaSiswa] = sVal.split('|');
     
     try {
-        // 1. Kalkulasi Tahfidz (Rata-rata Ziyadah & Murajaah)
         const qT = query(collection(db, "Tahfidz"), where("idSiswa", "==", idSiswa));
         const snapT = await getDocs(qT);
         let totalZ = 0, countZ = 0, totalM = 0, countM = 0;
         
         snapT.forEach(d => {
             const item = d.data();
-            if(item.ziyadah && item.ziyadah.poin) { totalZ += Number(item.ziyadah.poin); countZ++; }
-            if(item.murajaah && item.murajaah.poin) { totalM += Number(item.murajaah.poin); countM++; }
+            if(item.tanggal && item.tanggal.startsWith(bVal)) {
+                if(item.ziyadah && item.ziyadah.poin) { totalZ += Number(item.ziyadah.poin); countZ++; }
+                if(item.murajaah && item.murajaah.poin) { totalM += Number(item.murajaah.poin); countM++; }
+            }
         });
         
-        document.getElementById('raport-t-ziyadah').value = countZ > 0 ? (totalZ/countZ).toFixed(1) : 0;
-        document.getElementById('raport-t-murajaah').value = countM > 0 ? (totalM/countM).toFixed(1) : 0;
+        document.getElementById('tahfidz-ziyadah').value = countZ > 0 ? (totalZ/countZ).toFixed(1) : 0;
+        document.getElementById('tahfidz-murajaah').value = countM > 0 ? (totalM/countM).toFixed(1) : 0;
 
-        // 2. Kalkulasi Kepengasuhan (Total Poin)
         const qA = query(collection(db, "Kepengasuhan"), where("idSiswa", "==", idSiswa));
         const snapA = await getDocs(qA);
         let poinPelanggaran = 0, poinPrestasi = 0;
         
         snapA.forEach(d => {
             const item = d.data();
-            if(item.kategori === 'Pelanggaran') poinPelanggaran += Number(item.poin || 0);
-            if(item.kategori === 'Prestasi') poinPrestasi += Number(item.poin || 0);
+            if(item.tanggal && item.tanggal.startsWith(bVal)) {
+                if(item.kategori === 'Pelanggaran') poinPelanggaran += Number(item.poin || 0);
+                if(item.kategori === 'Prestasi') poinPrestasi += Number(item.poin || 0);
+            }
         });
         
-        document.getElementById('raport-t-pelanggaran').value = poinPelanggaran;
-        document.getElementById('raport-t-prestasi').value = poinPrestasi;
-        
-    } catch(e) {
-        console.error("Gagal menarik data otomatis:", e);
-    }
+        document.getElementById('tahfidz-pelanggaran').value = poinPelanggaran;
+        document.getElementById('tahfidz-prestasi').value = poinPrestasi;
+    } catch(e) { console.error("Gagal menarik data otomatis:", e); }
 };
 
-window.simpanRaportTahfidz = async function(e) {
+window.simpanInputTahfidz = async function(e) {
     e.preventDefault();
-    const btn = document.getElementById('btn-simpan-raport-t');
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Menyimpan...'; btn.disabled = true;
+    const btn = document.getElementById('btn-simpan-input-tahfidz'); btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Menyimpan...'; btn.disabled = true;
 
-    const semester = document.getElementById('raport-t-semester').value;
-    const siswaVal = document.getElementById('raport-t-siswa').value.split('|');
-    const idSiswa = siswaVal[0];
-    const namaSiswa = siswaVal[1];
+    const bulan = document.getElementById('tahfidz-bulan').value;
+    const [idSiswa, namaSiswa] = document.getElementById('tahfidz-siswa').value.split('|');
 
-    const dataRaport = {
-        jenis: 'Tahfidz',
-        semester: semester,
-        idSiswa: idSiswa,
-        namaSiswa: namaSiswa,
-        kelas: (window.appState.anak.find(a=>a.id===idSiswa)||{}).kelas || '-',
-        capaian: document.getElementById('raport-t-capaian').value,
-        rataZiyadah: Number(document.getElementById('raport-t-ziyadah').value),
-        rataMurajaah: Number(document.getElementById('raport-t-murajaah').value),
-        pelanggaran: Number(document.getElementById('raport-t-pelanggaran').value),
-        prestasi: Number(document.getElementById('raport-t-prestasi').value),
-        akhlaq: document.getElementById('raport-t-akhlaq').value,
-        catatan: document.getElementById('raport-t-catatan').value,
-        musyrif: window.currentUser.nama,
-        updatedAt: new Date().toISOString()
+    const payload = {
+        idSiswa, namaSiswa, bulan,
+        capaian: document.getElementById('tahfidz-capaian').value,
+        rataZiyadah: Number(document.getElementById('tahfidz-ziyadah').value),
+        rataMurajaah: Number(document.getElementById('tahfidz-murajaah').value),
+        pelanggaran: Number(document.getElementById('tahfidz-pelanggaran').value),
+        prestasi: Number(document.getElementById('tahfidz-prestasi').value),
+        akhlaq: document.getElementById('tahfidz-akhlaq').value,
+        musyrif: window.currentUser.nama, updatedAt: new Date().toISOString()
     };
 
     try {
-        // Menggunakan Composite ID (R_T_IdSiswa_Semester) mencegah duplikat
-        const docId = `RTahfidz_${idSiswa}_${semester.replace(/\s+/g, '')}`;
-        await setDoc(doc(db, "Raport", docId), dataRaport);
-        
-        alert("Raport Tahfidz & Asrama Berhasil Disimpan!");
-        document.getElementById('form-raport-tahfidz').reset();
-        window.loadDataRaportTahfidz();
-    } catch(err) { alert("Gagal menyimpan raport: " + err.message); }
+        const docId = `NT_${idSiswa}_${bulan}`;
+        await setDoc(doc(db, "NilaiTahfidz", docId), payload);
+        alert("Berhasil menyetor nilai Tahfidz & Kepengasuhan!");
+        document.getElementById('form-input-tahfidz').reset();
+        document.getElementById('lbl-semester-tahfidz').innerText = "Pilih Bulan Terlebih Dahulu";
+    } catch(err) { alert("Gagal menyetor nilai: " + err.message); }
     
-    btn.innerHTML = '<i class="fa-solid fa-save mr-2"></i> Simpan Raport Tahfidz & Asrama'; btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Setor Nilai Tahfidz'; btn.disabled = false;
 };
 
-window.loadDataRaportTahfidz = async function() {
-    const tbody = document.getElementById('tbody-raport-tahfidz');
-    if(!tbody) return;
+// ==========================================
+// TAB 3: PREVIEW & CETAK RAPORT (WALI KELAS/ADMIN)
+// ==========================================
+window.renderPreviewRaport = function() {
+    const area = document.getElementById('raport-content-area');
+    const optAnak = (window.appState.anak || []).filter(a => a.statusAkademik !== 'Lulus').sort((a,b) => (a.nama||'').localeCompare(b.nama||'')).map(a => `<option value="${a.id}|${a.nama}">${a.nama} (${a.kelas || '-'})</option>`).join('');
 
+    area.innerHTML = `
+        <div class="bg-indigo-50 p-6 md:p-8 rounded-2xl shadow-sm mb-6 border-t-4 border-indigo-500">
+            <h2 class="text-xl font-black text-indigo-900 mb-6 border-b border-indigo-200 pb-4"><i class="fa-solid fa-file-signature mr-2 text-indigo-500"></i> Kompilasi & Preview Raport (Wali Kelas)</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div>
+                    <label class="text-xs font-black text-slate-500 uppercase block mb-1">Pilih Jenis Raport</label>
+                    <select id="prev-jenis" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-indigo-900 focus:outline-indigo-500 bg-white" required>
+                        <option value="Umum">Raport Akademik Umum</option>
+                        <option value="Tahfidz">Raport Tahfidz & Kepengasuhan</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-black text-slate-500 uppercase block mb-1">Pilih Bulan & Tahun Evaluasi</label>
+                    <input type="month" id="prev-bulan" onchange="document.getElementById('lbl-prev-semester').innerText = window.getSemesterFromBulan(this.value)" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-indigo-900 focus:outline-indigo-500 bg-white" required>
+                    <p class="text-[10px] font-black text-indigo-600 mt-1" id="lbl-prev-semester">Pilih Bulan Terlebih Dahulu</p>
+                </div>
+                <div>
+                    <label class="text-xs font-black text-slate-500 uppercase block mb-1">Target Siswa</label>
+                    <select id="prev-siswa" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-indigo-900 focus:outline-indigo-500 bg-white" required>
+                        <option value="">-- Pilih Siswa --</option>${optAnak}
+                    </select>
+                </div>
+            </div>
+            <button type="button" onclick="window.generatePreviewRaport()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black px-6 py-3.5 rounded-xl shadow-md transition transform hover:-translate-y-1"><i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Tarik Data & Buat Draft Raport</button>
+        </div>
+
+        <div id="preview-result-area" class="hidden bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 mb-6 animate-slide-up">
+            </div>
+    `;
+};
+
+window.generatePreviewRaport = async function() {
+    const jenis = document.getElementById('prev-jenis').value;
+    const bulan = document.getElementById('prev-bulan').value;
+    const sVal = document.getElementById('prev-siswa').value;
+    const area = document.getElementById('preview-result-area');
+    
+    if(!bulan || !sVal) return alert("Silakan isi semua pilihan filter!");
+    const [idSiswa, namaSiswa] = sVal.split('|');
+    const semester = window.getSemesterFromBulan(bulan);
+    
+    area.innerHTML = `<div class="text-center p-10"><i class="fa-solid fa-spinner fa-spin text-4xl text-indigo-500 mb-3"></i><br><span class="font-bold text-slate-500">Mengkalkulasi Dokumen...</span></div>`;
+    area.classList.remove('hidden');
+
+    try {
+        if(jenis === 'Umum') {
+            const qN = query(collection(db, "NilaiMapel"), where("idSiswa", "==", idSiswa), where("bulan", "==", bulan));
+            const snapN = await getDocs(qN);
+            let nilaiMapel = []; let totalNilai = 0;
+            snapN.forEach(d => { const n = d.data(); nilaiMapel.push(n); totalNilai += n.nilai; });
+            
+            if(nilaiMapel.length === 0) return area.innerHTML = `<div class="text-center p-10 text-rose-500 font-bold"><i class="fa-solid fa-triangle-exclamation text-4xl mb-3 block"></i>Belum ada guru yang menyetor nilai akademik untuk siswa ini di bulan tersebut.</div>`;
+            
+            const rataRata = (totalNilai / nilaiMapel.length).toFixed(1);
+            let trMapel = nilaiMapel.map((m,i) => `<tr><td class="p-2 border text-center">${i+1}</td><td class="p-2 border">${m.mapel}</td><td class="p-2 border text-center">${m.kkm}</td><td class="p-2 border text-center font-bold">${m.nilai}</td><td class="p-2 border text-center">${m.predikat}</td></tr>`).join('');
+
+            window.tempDraftRaport = { jenis, semester, idSiswa, namaSiswa, nilaiMapel, rataRata };
+
+            area.innerHTML = `
+                <h3 class="text-xl font-black text-slate-800 text-center uppercase border-b-4 border-indigo-600 pb-4 mb-6">DRAFT RAPORT AKADEMIK UMUM<br><span class="text-sm font-bold text-slate-500">${namaSiswa} | ${semester}</span></h3>
+                <div class="mb-6 overflow-x-auto">
+                    <table class="w-full text-sm border-collapse">
+                        <thead class="bg-slate-100 text-slate-700 font-bold"><tr><td class="p-2 border text-center w-10">No</td><td class="p-2 border">Mata Pelajaran</td><td class="p-2 border text-center w-16">KKM</td><td class="p-2 border text-center w-16">Nilai</td><td class="p-2 border text-center w-24">Predikat</td></tr></thead>
+                        <tbody>${trMapel}<tr class="bg-indigo-50 font-black text-indigo-900"><td colspan="3" class="p-2 border text-right">RATA-RATA:</td><td colspan="2" class="p-2 border text-center">${rataRata}</td></tr></tbody>
+                    </table>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <h4 class="font-black text-sm text-slate-700 mb-3"><i class="fa-solid fa-fingerprint text-indigo-500 mr-1"></i> Kehadiran Bulanan</h4>
+                        <div class="grid grid-cols-3 gap-3">
+                            <div><label class="text-[10px] font-bold text-slate-500 block">Sakit</label><input type="number" id="draft-sakit" value="0" class="w-full border p-2 rounded text-center font-bold"></div>
+                            <div><label class="text-[10px] font-bold text-slate-500 block">Izin</label><input type="number" id="draft-izin" value="0" class="w-full border p-2 rounded text-center font-bold"></div>
+                            <div><label class="text-[10px] font-bold text-slate-500 block">Alpa</label><input type="number" id="draft-alpa" value="0" class="w-full border p-2 rounded text-center font-bold"></div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <h4 class="font-black text-sm text-slate-700 mb-3"><i class="fa-solid fa-comment-dots text-indigo-500 mr-1"></i> Catatan Wali Kelas</h4>
+                        <textarea id="draft-catatan" rows="3" class="w-full border p-2 rounded text-xs font-medium focus:outline-indigo-500" placeholder="Tulis catatan wali kelas..." required></textarea>
+                    </div>
+                </div>
+                <button type="button" onclick="window.simpanFinalRaport()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black px-8 py-4 rounded-xl shadow-lg transition text-lg"><i class="fa-solid fa-box-archive mr-2"></i> Simpan ke Arsip & Cetak PDF</button>
+            `;
+        } else {
+            const docId = `NT_${idSiswa}_${bulan}`;
+            const snap = await getDoc(doc(db, "NilaiTahfidz", docId));
+            if(!snap.exists()) return area.innerHTML = `<div class="text-center p-10 text-rose-500 font-bold"><i class="fa-solid fa-triangle-exclamation text-4xl mb-3 block"></i>Belum ada Musyrif yang menyetor nilai Tahfidz untuk siswa ini di bulan tersebut.</div>`;
+            
+            const n = snap.data();
+            window.tempDraftRaport = { jenis, semester, idSiswa, namaSiswa, capaian: n.capaian, rataZiyadah: n.rataZiyadah, rataMurajaah: n.rataMurajaah, pelanggaran: n.pelanggaran, prestasi: n.prestasi, akhlaq: n.akhlaq };
+
+            area.innerHTML = `
+                <h3 class="text-xl font-black text-slate-800 text-center uppercase border-b-4 border-teal-600 pb-4 mb-6">DRAFT RAPORT TAHFIDZ & ASRAMA<br><span class="text-sm font-bold text-slate-500">${namaSiswa} | ${semester}</span></h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-teal-50 p-4 rounded-xl border border-teal-100">
+                        <h4 class="font-black text-sm text-teal-800 mb-2 border-b border-teal-200 pb-2">Nilai Tahfidz</h4>
+                        <p class="text-xs font-bold text-slate-600 mb-1">Capaian: <span class="text-teal-700 font-black">${n.capaian}</span></p>
+                        <p class="text-xs font-bold text-slate-600 mb-1">Rata Ziyadah: <span class="text-teal-700 font-black">${n.rataZiyadah}</span></p>
+                        <p class="text-xs font-bold text-slate-600">Rata Muraja'ah: <span class="text-teal-700 font-black">${n.rataMurajaah}</span></p>
+                    </div>
+                    <div class="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                        <h4 class="font-black text-sm text-amber-800 mb-2 border-b border-amber-200 pb-2">Nilai Asrama</h4>
+                        <p class="text-xs font-bold text-slate-600 mb-1">Pelanggaran: <span class="text-rose-600 font-black">${n.pelanggaran} Poin</span></p>
+                        <p class="text-xs font-bold text-slate-600 mb-1">Prestasi: <span class="text-emerald-600 font-black">${n.prestasi} Poin</span></p>
+                        <p class="text-xs font-bold text-slate-600">Akhlaq/Adab: <span class="text-amber-700 font-black">${n.akhlaq}</span></p>
+                    </div>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6">
+                    <h4 class="font-black text-sm text-slate-700 mb-3"><i class="fa-solid fa-comment-dots text-teal-500 mr-1"></i> Catatan Musyrif / Kepala Asrama</h4>
+                    <textarea id="draft-catatan" rows="3" class="w-full border p-2 rounded text-xs font-medium focus:outline-teal-500" placeholder="Tulis catatan asrama..." required></textarea>
+                </div>
+                <button type="button" onclick="window.simpanFinalRaport()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black px-8 py-4 rounded-xl shadow-lg transition text-lg"><i class="fa-solid fa-box-archive mr-2"></i> Simpan ke Arsip & Cetak PDF</button>
+            `;
+        }
+    } catch(e) { area.innerHTML = `<div class="text-center p-10 text-rose-500 font-bold">Terjadi kesalahan sistem.</div>`; }
+};
+
+window.simpanFinalRaport = async function() {
+    const d = window.tempDraftRaport;
+    const ct = document.getElementById('draft-catatan').value;
+    if(!ct) return alert("Catatan wajib diisi!");
+
+    d.kelas = (window.appState.anak.find(a=>a.id===d.idSiswa)||{}).kelas || '-';
+    d.catatan = ct;
+    d.updatedAt = new Date().toISOString();
+
+    if(d.jenis === 'Umum') {
+        d.kehadiran = { sakit: document.getElementById('draft-sakit').value, izin: document.getElementById('draft-izin').value, alpa: document.getElementById('draft-alpa').value };
+        d.waliKelas = window.currentUser.nama;
+    } else {
+        d.musyrif = window.currentUser.nama;
+    }
+
+    try {
+        const docId = `RAPORT_${d.jenis}_${d.idSiswa}_${d.semester.replace(/\s+/g,'')}`;
+        await setDoc(doc(db, "Raport", docId), d);
+        alert("Raport Final Berhasil Diarsipkan!");
+        document.getElementById('preview-result-area').classList.add('hidden');
+        window.cetakRaportPDF(docId, d.jenis);
+    } catch(err) { alert("Gagal menyimpan Arsip: " + err.message); }
+};
+
+// ==========================================
+// TAB 4: ARSIP RAPORT (ADMIN/TU)
+// ==========================================
+window.renderArsipRaport = function() {
+    const area = document.getElementById('raport-content-area');
+    area.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+            <div class="p-6 bg-slate-800 border-b border-slate-700 font-black text-white flex justify-between items-center">
+                <span><i class="fa-solid fa-box-archive mr-2"></i> Pangkalan Data Arsip Raport Terpusat</span>
+                <button onclick="window.loadArsipRaport()" class="text-xs bg-slate-700 border border-slate-600 px-3 py-1.5 rounded-lg shadow-sm hover:bg-slate-600 transition"><i class="fa-solid fa-sync mr-1"></i> Muat Ulang</button>
+            </div>
+            <div class="overflow-x-auto p-4 custom-scrollbar">
+                <table class="w-full text-left text-sm whitespace-nowrap">
+                    <thead class="bg-slate-100 text-slate-600 border-b-2 border-slate-200 uppercase text-[10px]">
+                        <tr><th class="p-3">Tgl Terbit</th><th class="p-3">Kategori</th><th class="p-3">Semester</th><th class="p-3">Nama Siswa</th><th class="p-3">Penanggung Jawab</th><th class="p-3 text-center">Aksi Dokumen</th></tr>
+                    </thead>
+                    <tbody id="tbody-arsip-raport"><tr><td colspan="6" class="text-center p-8 text-slate-400 font-bold"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Memuat Arsip...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    window.loadArsipRaport();
+};
+
+window.loadArsipRaport = async function() {
+    const tbody = document.getElementById('tbody-arsip-raport');
+    if(!tbody) return;
     try {
         const q = query(collection(db, "Raport"), orderBy("updatedAt", "desc"));
         const snap = await getDocs(q);
         let html = '';
         snap.forEach(d => {
             const item = d.data();
-            if(item.jenis !== 'Tahfidz') return;
-
-            let badgeAkhlaq = 'bg-slate-100 text-slate-700';
-            if(item.akhlaq.includes('A')) badgeAkhlaq = 'bg-emerald-100 text-emerald-700';
-            else if(item.akhlaq.includes('B')) badgeAkhlaq = 'bg-blue-100 text-blue-700';
-            else if(item.akhlaq.includes('C')) badgeAkhlaq = 'bg-amber-100 text-amber-700';
-            else if(item.akhlaq.includes('D')) badgeAkhlaq = 'bg-rose-100 text-rose-700';
+            const badge = item.jenis === 'Umum' ? 'bg-blue-100 text-blue-700' : 'bg-teal-100 text-teal-700';
+            const pj = item.jenis === 'Umum' ? item.waliKelas : item.musyrif;
+            const tgl = new Date(item.updatedAt).toLocaleDateString('id-ID', {day:'2-digit',month:'short',year:'numeric'});
 
             html += `
             <tr class="border-b border-slate-100 hover:bg-slate-50 transition">
-                <td class="p-3 font-bold text-slate-500">${item.semester}</td>
+                <td class="p-3 font-bold text-slate-500 text-xs">${tgl}</td>
+                <td class="p-3"><span class="px-2 py-1 rounded text-[10px] font-black uppercase border ${badge}">${item.jenis}</span></td>
+                <td class="p-3 font-bold text-slate-700 text-xs">${item.semester}</td>
                 <td class="p-3 font-black text-slate-800">${item.namaSiswa} <span class="text-[9px] bg-slate-200 text-slate-600 px-1.5 rounded ml-1">Kls ${item.kelas}</span></td>
-                <td class="p-3 font-bold text-teal-700">${item.capaian}</td>
-                <td class="p-3 text-center"><span class="font-black px-2.5 py-1 rounded-lg border shadow-sm ${badgeAkhlaq}">${item.akhlaq.split(' ')[0]}</span></td>
-                <td class="p-3 text-xs font-bold text-slate-500">${item.musyrif}</td>
+                <td class="p-3 text-xs font-bold text-slate-500">${pj}</td>
                 <td class="p-3 text-center">
-                    <button onclick="window.cetakRaportPDF('${d.id}', 'Tahfidz')" class="bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white px-3 py-1.5 rounded-lg transition font-bold text-xs shadow-sm mr-1"><i class="fa-solid fa-print"></i> Cetak PDF</button>
-                    <button onclick="window.hapusRaport('${d.id}')" class="bg-red-50 hover:bg-red-500 text-red-500 hover:text-white px-2 py-1.5 rounded-lg transition font-bold text-xs shadow-sm"><i class="fa-solid fa-trash"></i></button>
+                    <button onclick="window.cetakRaportPDF('${d.id}', '${item.jenis}')" class="bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white px-3 py-1.5 rounded-lg transition font-bold text-xs shadow-sm mr-1"><i class="fa-solid fa-print"></i> Cetak Ulang PDF</button>
+                    <button onclick="window.hapusArsipRaport('${d.id}')" class="bg-red-50 hover:bg-red-500 text-red-500 hover:text-white px-2 py-1.5 rounded-lg transition font-bold text-xs shadow-sm"><i class="fa-solid fa-trash"></i></button>
                 </td>
             </tr>`;
         });
-        tbody.innerHTML = html || '<tr><td colspan="6" class="text-center p-8 text-slate-400 font-medium">Belum ada arsip raport Tahfidz.</td></tr>';
+        tbody.innerHTML = html || '<tr><td colspan="6" class="text-center p-8 text-slate-400 font-medium">Belum ada dokumen arsip raport.</td></tr>';
     } catch(e) { tbody.innerHTML = '<tr><td colspan="6" class="text-center p-8 text-red-500 font-bold">Gagal memuat data.</td></tr>'; }
 };
 
-// ==========================================
-// MESIN CETAK PDF RAPORT (OTOMATISASI KOP & DESAIN)
-// ==========================================
-import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+window.hapusArsipRaport = async function(id) {
+    if(confirm("Yakin ingin menghapus dokumen raport final ini secara permanen dari Arsip? (Data mentah di Tahfidz/Mapel tidak akan terhapus)")) {
+        try { await deleteDoc(doc(db, "Raport", id)); window.loadArsipRaport(); } catch(e) { alert("Gagal menghapus!"); }
+    }
+};
 
+// ==========================================
+// MESIN CETAK PDF RAPORT
+// ==========================================
 window.cetakRaportPDF = async function(idRaport, jenis) {
     if (typeof window.showGlobalLoading === "function") window.showGlobalLoading('Menyiapkan Dokumen PDF...');
     
@@ -461,7 +562,7 @@ window.cetakRaportPDF = async function(idRaport, jenis) {
         
         if (!docSnap.exists()) {
             if (typeof window.hideGlobalLoading === "function") window.hideGlobalLoading();
-            return alert("Dokumen Raport tidak ditemukan!");
+            return alert("Dokumen Raport tidak ditemukan di database!");
         }
 
         const data = docSnap.data();
@@ -491,10 +592,10 @@ window.cetakRaportPDF = async function(idRaport, jenis) {
         let contentHtml = '';
 
         if (jenis === 'Umum') {
-            const trMapel = data.nilaiMapel.map((m, i) => `
+            const trMapel = (data.nilaiMapel||[]).map((m, i) => `
                 <tr>
                     <td style="border:1px solid #cbd5e1; padding:8px; text-align:center;">${i+1}</td>
-                    <td style="border:1px solid #cbd5e1; padding:8px;">${m.nama}</td>
+                    <td style="border:1px solid #cbd5e1; padding:8px;">${m.mapel || m.nama}</td>
                     <td style="border:1px solid #cbd5e1; padding:8px; text-align:center;">${m.kkm}</td>
                     <td style="border:1px solid #cbd5e1; padding:8px; text-align:center; font-weight:bold;">${m.nilai}</td>
                     <td style="border:1px solid #cbd5e1; padding:8px; text-align:center;">${m.predikat.split(' ')[0]}</td>
