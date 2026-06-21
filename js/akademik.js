@@ -36,6 +36,19 @@ window.dropJadwal = async function(event, hari, jamKe, kelasTarget) {
     const data = JSON.parse(rawData);
     const jadwalSemua = window.appState.jadwal || [];
 
+    const profilGuru = window.appState.pegawai.find(p => p.id === data.idGuru);
+    if (profilGuru) {
+        const jf = (profilGuru.detailJabatan || []).find(j => j.namaJabatan.toLowerCase().includes('guru'));
+        if (jf) {
+            const maxKuota = Number(jf.kuota || 0);
+            const terpakai = jadwalSemua.filter(j => j.idGuru === data.idGuru).length;
+            const isOverwritingOwnSlot = jadwalSemua.some(j => j.hari === hari && j.jamKe === jamKe && j.kelas === kelasTarget && j.idGuru === data.idGuru);
+            if (!isOverwritingOwnSlot && terpakai >= maxKuota) {
+                return alert(`❌ GAGAL! \n\nSisa Kuota JP untuk Guru ${data.namaGuru} sudah habis (${maxKuota} JP maksimal).`);
+            }
+        }
+    }
+
     const bentrok = jadwalSemua.find(j => j.hari === hari && j.jamKe === jamKe && j.idGuru === data.idGuru && j.kelas !== kelasTarget);
     if (bentrok) return alert(`❌ BENTROK! \n\nGuru ${data.namaGuru} sudah memiliki jadwal mengajar di ${bentrok.kelas} pada hari ${hari} Jam ke-${jamKe}.`);
 
@@ -182,25 +195,27 @@ export function renderHalamanAkademik(container) {
         const maxKuota = Number(jf.kuota || 0);
         const terpakai = jadwalSemua.filter(j => j.idGuru === guru.id).length;
         const sisa = maxKuota - terpakai;
+        const isBisaDrag = sisa > 0;
         
         let mapelHTML = mapels.map(m => {
             const terpakaiMapel = jadwalSemua.filter(j => j.idGuru === guru.id && j.mapel === m).length;
             return `
-            <div draggable="true" ondragstart="window.dragStartJadwal(event, '${guru.id}', '${guru.nama}', '${m}')" ondragend="window.dragEndJadwal(event)" class="flex items-center justify-between bg-indigo-50 border border-indigo-100 p-2 rounded-lg cursor-grab hover:bg-indigo-100 hover:border-indigo-300 transition group mt-1.5 shadow-sm">
-                <span class="text-[10px] font-black text-indigo-700 uppercase truncate pr-2"><i class="fa-solid fa-book-open mr-1.5 opacity-50"></i> ${m}</span>
+            <div ${isBisaDrag ? `draggable="true" ondragstart="window.dragStartJadwal(event, '${guru.id}', '${guru.nama}', '${m}')" ondragend="window.dragEndJadwal(event)"` : `draggable="false" title="Kuota JP sudah habis!"`} 
+                 class="flex items-center justify-between ${isBisaDrag ? 'bg-indigo-50 border-indigo-100 cursor-grab hover:bg-indigo-100 hover:border-indigo-300' : 'bg-slate-50 border-slate-200 cursor-not-allowed opacity-50'} border p-2 rounded-lg transition group mt-1.5 shadow-sm">
+                <span class="text-[10px] font-black ${isBisaDrag ? 'text-indigo-700' : 'text-slate-500'} uppercase truncate pr-2"><i class="fa-solid fa-book-open mr-1.5 opacity-50"></i> ${m}</span>
                 <div class="flex items-center shrink-0">
-                    <span class="text-[9px] bg-white text-indigo-500 border border-indigo-100 px-1.5 py-0.5 rounded font-bold mr-2">${terpakaiMapel} JP</span>
-                    <i class="fa-solid fa-grip-vertical text-indigo-300 group-hover:text-indigo-500"></i>
+                    <span class="text-[9px] bg-white ${isBisaDrag ? 'text-indigo-500 border-indigo-100' : 'text-slate-400 border-slate-200'} border px-1.5 py-0.5 rounded font-bold mr-2">${terpakaiMapel} JP</span>
+                    <i class="fa-solid ${isBisaDrag ? 'fa-grip-vertical text-indigo-300 group-hover:text-indigo-500' : 'fa-lock text-slate-300'}"></i>
                 </div>
             </div>`;
         }).join('');
         
         return `
-        <div class="bg-white border-2 border-slate-200 p-3 rounded-xl mb-3 hover:border-indigo-400 hover:shadow-md transition">
+        <div class="bg-white border-2 border-slate-200 p-3 rounded-xl mb-3 ${isBisaDrag ? 'hover:border-indigo-400 hover:shadow-md' : 'border-dashed bg-slate-50 opacity-80'} transition">
             <div class="flex items-center mb-1">
-                <img src="${(guru.fotoProfil && guru.fotoProfil[0]) ? guru.fotoProfil[0] : 'https://ui-avatars.com/api/?name='+guru.nama}" class="w-9 h-9 rounded-full mr-3 border shadow-sm">
+                <img src="${(guru.fotoProfil && guru.fotoProfil[0]) ? guru.fotoProfil[0] : 'https://ui-avatars.com/api/?name='+guru.nama}" class="w-9 h-9 rounded-full mr-3 border shadow-sm ${!isBisaDrag ? 'grayscale' : ''}">
                 <div class="flex-1">
-                    <h4 class="font-bold text-slate-800 text-sm leading-tight line-clamp-1" title="${guru.nama}">${guru.nama}</h4>
+                    <h4 class="font-bold ${isBisaDrag ? 'text-slate-800' : 'text-slate-500'} text-sm leading-tight line-clamp-1" title="${guru.nama}">${guru.nama}</h4>
                     <span class="text-[10px] font-bold ${sisa < 0 ? 'text-red-500' : (sisa === 0 ? 'text-orange-500' : 'text-emerald-600')}">Sisa Kuota: ${sisa} JP</span>
                 </div>
             </div>
