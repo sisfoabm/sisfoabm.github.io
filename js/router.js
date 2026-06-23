@@ -1,31 +1,62 @@
 import { app, db } from './firebase-init.js';
 import { doc, onSnapshot, updateDoc, collection, getDocs, query, where, orderBy, limit, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getDatabase, ref, onValue, push, set, remove, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-import { renderHalamanLembaga, renderHalamanPegawai, renderHalamanAnak, renderHalamanAbsensi } from './datamaster.js';
+import { renderHalamanLembaga, renderHalamanPegawai, renderHalamanAnak, renderHalamanAbsensi, renderHalamanLisensi } from './datamaster.js';
 import { renderHalamanKalender } from './kalender.js';
 import { renderHalamanAkademik } from './akademik.js';
 import { renderHalamanKeuangan } from './keuangan.js';
 import { renderHalamanTugas } from './tugas.js';
 import { renderHalamanKepengasuhan } from './kepengasuhan.js';
 import { renderHalamanTahfidz } from './tahfidz.js';
-import { renderHalamanRaport } from './raport.js'; // <-- BARU
+import { renderHalamanRaport } from './raport.js'; 
+import { renderHalamanPPDB } from './ppdb_admin.js'; 
 
 const MENU_ITEMS = [
     { id: 'dashboard', icon: 'fa-chart-pie', label: 'Dashboard' },
-    { id: 'lembaga', icon: 'fa-building', label: 'Data Lembaga' },
-    { id: 'pegawai', icon: 'fa-users', label: 'Data Pegawai' },
-    { id: 'anak', icon: 'fa-child', label: 'Data Anak' },
-    { id: 'tugas', icon: 'fa-list-check', label: 'Tugas Pegawai' },
     { id: 'absensi', icon: 'fa-fingerprint', label: 'Absensi & Cuti' },
-    { id: 'kalender', icon: 'fa-calendar-days', label: 'Kalender Pendidikan' },
     { id: 'akademik', icon: 'fa-chalkboard-user', label: 'Akademik' },
+    { id: 'kalender', icon: 'fa-calendar-days', label: 'Kalender Pendidikan' },
+    { id: 'tugas', icon: 'fa-list-check', label: 'Tugas Pegawai' },
     { id: 'kepengasuhan', icon: 'fa-bed', label: 'Kepengasuhan & Asrama' },
     { id: 'tahfidz', icon: 'fa-book-quran', label: 'Tahfidz Al-Quran' },
-    { id: 'raport', icon: 'fa-file-signature', label: 'E-Raport Digital' }, // <-- BARU
+    { id: 'raport', icon: 'fa-file-signature', label: 'E-Raport Digital' }, 
     { id: 'keuangan', icon: 'fa-sack-dollar', label: 'Payroll & Keuangan' },
+    { id: 'anak', icon: 'fa-child', label: 'Data Anak' },
+    { id: 'pegawai', icon: 'fa-users', label: 'Data Pegawai' },
+    { id: 'lembaga', icon: 'fa-building', label: 'Data Lembaga' },
+    { id: 'ppdb', icon: 'fa-address-card', label: 'Data PPDB' }, 
+    { id: 'lisensi', icon: 'fa-gem', label: 'Lisensi & Modul' }
 ];
 
 window.MENU_ITEMS_GLOBAL = MENU_ITEMS; 
+
+// ==========================================
+// FUNGSI CEK LISENSI & TRIAL (GLOBAL)
+// ==========================================
+window.cekLisensi = function(kodeFitur) {
+    const lembaga = (window.appState && window.appState.lembaga && window.appState.lembaga[0]) ? window.appState.lembaga[0] : {};
+    const fitur = lembaga.lisensiFitur || [];
+    const trialEnd = lembaga.masaUjiCobaAkhir || "";
+    
+    if (trialEnd) {
+        const today = new Date().toISOString().split('T')[0];
+        if (today <= trialEnd) return true; // Trial masih aktif
+    }
+    return fitur.includes(kodeFitur);
+};
+
+window.renderLockedPremiumHTML = function(namaModul) {
+    const currentUser = window.currentUser || {};
+    const isSA = currentUser.hakAkses === 'Super Admin';
+    return `
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-10 flex flex-col items-center justify-center text-center min-h-[60vh] animate-fade-in border-t-4 border-t-amber-400">
+            <i class="fa-solid fa-lock text-7xl text-amber-400 mb-6 drop-shadow-md"></i>
+            <h2 class="text-3xl font-black text-slate-800 mb-3">Modul Tersegel</h2>
+            <p class="text-slate-500 font-medium mb-8 max-w-lg leading-relaxed">Halaman / Fitur <b>${namaModul}</b> adalah bagian dari Lisensi Premium. Segel aktif karena modul ini belum dilanggan atau masa uji coba telah berakhir.</p>
+            ${isSA ? `<button onclick="window.navigate('lisensi')" class="bg-amber-500 hover:bg-amber-600 text-white px-8 py-3.5 rounded-xl font-black shadow-lg transition transform hover:-translate-y-1"><i class="fa-solid fa-key mr-2"></i> Buka Segel di Pengaturan Lisensi</button>` : `<div class="bg-slate-50 px-8 py-4 rounded-xl font-bold text-slate-500 border border-slate-200"><i class="fa-solid fa-headset mr-2"></i> Hubungi Super Admin Yayasan untuk membuka akses.</div>`}
+        </div>
+    `;
+};
 
 function getFreshUser() {
     let user = window.currentUser || {};
@@ -44,7 +75,7 @@ export function renderLayout() {
     window.renderSidebarMenu(); 
     
     const currentUser = getFreshUser();
-    const lembaga = (window.appState && window.appState.lembaga && window.appState.lembaga[0]) ? window.appState.lembaga[0] : {}; // Tarik identitas lembaga
+    const lembaga = (window.appState && window.appState.lembaga && window.appState.lembaga[0]) ? window.appState.lembaga[0] : {}; 
     const header = document.getElementById('app-header');
     header.innerHTML = `
         <div class="flex items-center gap-3 w-full max-w-[60%]">
@@ -55,6 +86,7 @@ export function renderLayout() {
             </div>
         </div>
         <div class="flex items-center space-x-2 md:space-x-4 shrink-0">
+            <button onclick="window.navigate('absensi')" class="flex items-center bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white px-3 md:px-4 py-2 rounded-xl text-xs font-black shadow-md transition transform hover:-translate-y-0.5"><i class="fa-solid fa-fingerprint md:mr-2"></i> <span class="hidden md:inline">Presensi</span></button>
             <div class="flex items-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 px-3 py-1.5 rounded-xl transition border border-transparent hover:border-slate-200 dark:hover:border-slate-600" onclick="window.navigate('pegawai')">
                 <img id="header-foto-profil" src="${(currentUser.fotoProfil && currentUser.fotoProfil.length > 0) ? currentUser.fotoProfil[0] : `https://ui-avatars.com/api/?name=${currentUser.nama || 'User'}&background=e2e8f0`}" class="w-9 h-9 rounded-full object-cover mr-2 md:mr-3 border-2 border-slate-200 shadow-sm">
                 <span id="header-nama-profil" class="font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">${currentUser.nama || 'User'}</span>
@@ -68,34 +100,82 @@ export function renderLayout() {
 
 window.renderSidebarMenu = function() {
     const currentUser = getFreshUser();
-    const isSuperAdmin = currentUser.hakAkses === 'Super Admin' || currentUser.hakAkses === 'Administrator' || currentUser.hakAkses === 'Operator/TU' || currentUser.role === 'admin' || currentUser.username === 'admin';
+    const lembaga = window.appState.lembaga[0] || {};
+    
+    // Kunci Akses Khusus
+    const isSuperAdmin = currentUser.hakAkses === 'Super Admin';
+    const isKepala = (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('kepala'));
     const userJabatans = (currentUser.detailJabatan || []).map(j => j.namaJabatan);
     
-    const wewenangMatrix = (window.appState && window.appState.lembaga && window.appState.lembaga[0] && window.appState.lembaga[0].wewenangMatrix) ? window.appState.lembaga[0].wewenangMatrix : {};
+    const wewenangMatrix = lembaga.wewenangMatrix || {};
 
     let allowedMenuIds = new Set();
     if (isSuperAdmin) {
         MENU_ITEMS.forEach(m => allowedMenuIds.add(m.id));
     } else {
         allowedMenuIds.add('dashboard'); 
+        if (isKepala) allowedMenuIds.add('ppdb'); 
+        
         userJabatans.forEach(jabatan => {
             const menus = wewenangMatrix[jabatan] || [];
             menus.forEach(mId => allowedMenuIds.add(mId));
         });
     }
 
+    if (!isSuperAdmin) allowedMenuIds.delete('lisensi'); // Lisensi murni hanya SA
+
     const filteredMenus = MENU_ITEMS.filter(m => allowedMenuIds.has(m.id));
     const sidebar = document.getElementById('app-sidebar');
     
+    // Tentukan teks status lisensi
+    const trialEnd = lembaga.masaUjiCobaAkhir || "";
+    let statusLisensi = "Lisensi Standar";
+    if (trialEnd) {
+        const today = new Date().toISOString().split('T')[0];
+        if (today <= trialEnd) statusLisensi = "Masa Uji Coba (Trial)";
+        else if ((lembaga.lisensiFitur || []).length > 0) statusLisensi = "Lisensi Modular";
+    } else if ((lembaga.lisensiFitur || []).length > 0) {
+        statusLisensi = "Lisensi Modular";
+    }
+
     if (sidebar) {
         sidebar.innerHTML = `
-            <div class="p-4 font-black text-xl border-b text-primary">Portal Yayasan</div>
-            <nav class="flex-1 p-3 space-y-2">
-                ${filteredMenus.map(m => `
-                    <button onclick="window.navigate('${m.id}')" class="w-full flex items-center p-3 hover:bg-blue-50 dark:hover:bg-slate-700 text-left rounded transition ${window.currentPage === m.id ? 'bg-blue-50 text-blue-600 font-bold' : 'text-slate-600'}">
-                        <i class="fa-solid ${m.icon} w-8 ${window.currentPage === m.id ? 'text-blue-500' : 'text-slate-400'}"></i> <span class="font-semibold">${m.label}</span>
+            <div class="p-4 border-b border-slate-200">
+                <div class="font-black text-xl text-primary">Portal Yayasan</div>
+                <div class="text-amber-600 mt-1 font-bold" style="font-family: 'Caveat', 'Comic Sans MS', cursive; font-size: 1.15rem; transform: rotate(-3deg); transform-origin: left center;">${statusLisensi}</div>
+            </div>
+            <nav class="flex-1 p-3 space-y-2 overflow-y-auto custom-scrollbar">
+                ${filteredMenus.map(m => {
+                    let lockIcon = '';
+                    if (m.id === 'tugas' && !window.cekLisensi('tugas_pegawai')) lockIcon = '<i class="fa-solid fa-lock text-amber-500 ml-auto text-xs" title="Tersegel Premium"></i>';
+                    if (m.id === 'ppdb' && !window.cekLisensi('ppdb_online')) lockIcon = '<i class="fa-solid fa-lock text-amber-500 ml-auto text-xs" title="Tersegel Premium"></i>';
+                    if (m.id === 'kalender' && !window.cekLisensi('kalender_plus')) lockIcon = '<i class="fa-solid fa-lock text-amber-500 ml-auto text-xs" title="Tersegel Premium"></i>';
+                    
+                    let btnClass = window.currentPage === m.id ? 'bg-blue-50 text-blue-600 font-bold' : 'text-slate-600 hover:bg-blue-50 dark:hover:bg-slate-700';
+                    let iClass = window.currentPage === m.id ? 'text-blue-500' : 'text-slate-400';
+                    
+                    // Warna khusus untuk tab tertentu
+                    if (m.id === 'lembaga') {
+                        btnClass = window.currentPage === m.id ? 'bg-rose-100 text-rose-800 font-bold' : 'text-rose-800 bg-rose-50 hover:bg-rose-100 hover:text-rose-900';
+                        iClass = window.currentPage === m.id ? 'text-rose-700' : 'text-rose-600';
+                    }
+                    if (m.id === 'ppdb') {
+                        btnClass = window.currentPage === m.id ? 'bg-emerald-100 text-emerald-800 font-bold' : 'text-emerald-800 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-900';
+                        iClass = window.currentPage === m.id ? 'text-emerald-700' : 'text-emerald-600';
+                    }
+                    if (m.id === 'lisensi') {
+                        btnClass = window.currentPage === m.id ? 'bg-amber-100 text-amber-800 font-bold' : 'text-amber-800 bg-amber-50 hover:bg-amber-100 hover:text-amber-900';
+                        iClass = window.currentPage === m.id ? 'text-amber-600' : 'text-amber-500';
+                    }
+
+                    return `
+                    <button onclick="window.navigate('${m.id}')" class="w-full flex items-center p-3 text-left rounded-xl transition shadow-sm border border-transparent hover:border-slate-200 ${btnClass}">
+                        <i class="fa-solid ${m.icon} w-8 ${iClass}"></i> 
+                        <span class="font-semibold flex-1">${m.label}</span>
+                        ${lockIcon}
                     </button>
-                `).join('')}
+                    `;
+                }).join('')}
             </nav>
         `;
     }
@@ -174,7 +254,6 @@ window.hapusPemberitahuanRTDB = function(id) {
     remove(ref(rtdb, 'Pemberitahuan/' + id));
 };
 
-// ================= FUNGSI WIDGET NOTIFIKASI ORTU =================
 window.toggleKelasNotif = function(cb, kelas) {
     const safeKelas = kelas.replace(/\s+/g, '-');
     document.querySelectorAll('.notif-chk-' + safeKelas).forEach(el => {
@@ -191,12 +270,10 @@ window.toggleNotifCard = function() {
     body.classList.toggle('hidden');
     
     if (body.classList.contains('hidden')) {
-        // State Tertutup (Ikon Besar di Tengah)
         cover.className = 'flex flex-col py-10 items-center justify-center transition-all duration-500 w-full';
         icon.className = 'fa-solid fa-bullhorn text-7xl mb-4 transition-all duration-500 transform group-hover:scale-110 drop-shadow-lg';
         btn.className = 'w-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white p-5 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-md border-b-4 border-purple-700 cursor-pointer group';
     } else {
-        // State Terbuka (Ikon Kecil di Kiri, Form Tampil)
         cover.className = 'flex flex-row items-center justify-start transition-all duration-500 w-full';
         icon.className = 'fa-solid fa-bullhorn text-xl mr-3 transition-all duration-500 text-purple-600';
         btn.className = 'w-full bg-purple-100 hover:bg-purple-200 text-purple-900 p-4 rounded-t-2xl flex items-center justify-start transition-all duration-500 border-b border-purple-200 cursor-pointer';
@@ -273,18 +350,15 @@ window.kirimNotifOrtu = async function(e) {
         document.querySelectorAll('input[type="checkbox"][onchange^="window.toggleKelasNotif"]').forEach(cb => cb.checked = false);
     } catch(err) { 
         alert("Gagal mengirim pemberitahuan: " + err.message); 
-        console.error(err);
     }
     
     btn.innerHTML = ori; btn.disabled = false;
 };
 
-// ================= FUNGSI LOGIKA WIDGET =================
 window.loadDashboardAdvancedWidgets = async function() {
     const dDate = new Date();
     const startOfMonth = `${dDate.getFullYear()}-${String(dDate.getMonth()+1).padStart(2,'0')}-01`;
 
-    // 1. Pending Approvals (Cuti / Izin / Susulan)
     const pendingEl = document.getElementById('dasbor-pending-list');
     if(pendingEl) {
         try {
@@ -304,7 +378,6 @@ window.loadDashboardAdvancedWidgets = async function() {
         } catch(e) { pendingEl.innerHTML = '<div class="text-xs text-red-500">Gagal memuat.</div>'; }
     }
 
-    // 2. Keuangan Bulan Ini
     const keuEl = document.getElementById('dasbor-keuangan-widget');
     if(keuEl) {
         try {
@@ -327,7 +400,6 @@ window.loadDashboardAdvancedWidgets = async function() {
         } catch(e) { keuEl.innerHTML = '<div class="text-xs text-red-500 p-3">Gagal sinkron.</div>'; }
     }
 
-    // 5. Peringkat Disiplin
     const disEl = document.getElementById('dasbor-disiplin-list');
     if(disEl) {
         try {
@@ -491,7 +563,6 @@ window.loadTugasDasbor = function() {
     }
 };
 
-// ================= MODAL ATUR DASBOR PER JABATAN =================
 window.tempDasborConfigAll = {};
 window.tempDasborJabatan = 'Global';
 
@@ -531,7 +602,6 @@ window.bukaModalAturDasbor = function() {
             </div>
 
             <div id="dasbor-cb-container" class="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-2 grid grid-cols-1 md:grid-cols-2 gap-3">
-                <!-- Checkbox dirender lewat JS -->
             </div>
             
             <div class="mt-6 border-t pt-4 flex justify-end">
@@ -551,36 +621,42 @@ window.renderCheckboxesAturDasbor = function(jabatan) {
         trenTahfidz: true, trenKepengasuhan: true, notifOrtu: true
     };
     
-    let conf = window.tempDasborConfigAll[jabatan];
-    if (!conf) conf = defConfig;
+    let conf = window.tempDasborConfigAll[jabatan] || defConfig;
 
-    const cb = (key, label, desc, color) => `
-        <label class="flex items-start p-4 border-2 border-slate-100 rounded-xl cursor-pointer hover:bg-${color}-50 hover:border-${color}-200 transition group bg-white shadow-sm">
-            <input type="checkbox" class="mt-1 w-5 h-5 text-${color}-600 rounded cursor-pointer accent-${color}-600 dasbor-cfg-chk" data-key="${key}" ${conf[key] ? 'checked' : ''}>
-            <div class="ml-3"><span class="font-black text-slate-800 group-hover:text-${color}-700 block text-sm">${label}</span><span class="text-[10px] font-bold text-slate-400 leading-tight mt-0.5 block">${desc}</span></div>
+    // --- GEMBOK MODULAR DASHBOARD WIDGET ---
+    const cb = (key, label, desc, color, reqFeature) => {
+        let isLocked = reqFeature ? !window.cekLisensi(reqFeature) : false;
+        return `
+        <label class="flex items-start p-4 border-2 ${isLocked ? 'border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed' : `border-slate-100 bg-white cursor-pointer hover:bg-${color}-50 hover:border-${color}-200`} rounded-xl transition group shadow-sm">
+            <input type="checkbox" class="mt-1 w-5 h-5 ${isLocked ? 'text-slate-400' : `text-${color}-600 accent-${color}-600`} rounded dasbor-cfg-chk" data-key="${key}" ${conf[key] && !isLocked ? 'checked' : ''} ${isLocked ? 'disabled' : ''}>
+            <div class="ml-3 w-full">
+                <span class="font-black ${isLocked ? 'text-slate-500' : `text-slate-800 group-hover:text-${color}-700`} block text-sm flex justify-between">${label} ${isLocked ? '<i class="fa-solid fa-lock text-amber-500 text-xs" title="Tersegel Premium"></i>' : ''}</span>
+                <span class="text-[10px] font-bold text-slate-400 leading-tight mt-0.5 block">${desc}</span>
+            </div>
         </label>`;
+    };
 
     const container = document.getElementById('dasbor-cb-container');
     if (container) {
         container.innerHTML = `
-            ${cb('pegawai', 'Total Pegawai', 'Statistik jumlah seluruh pegawai aktif.', 'blue')}
-            ${cb('siswa', 'Total Siswa', 'Statistik jumlah anak didik / siswa aktif.', 'orange')}
-            ${cb('asrama', 'Kapasitas Asrama', 'Statistik ketersediaan & sisa kuota ranjang asrama.', 'teal')}
-            ${cb('token', 'Token Otorisasi', 'Akses PIN rahasia penghapusan data.', 'red')}
+            ${cb('pegawai', 'Total Pegawai', 'Statistik jumlah seluruh pegawai aktif.', 'blue', null)}
+            ${cb('siswa', 'Total Siswa', 'Statistik jumlah anak didik / siswa aktif.', 'orange', null)}
+            ${cb('asrama', 'Kapasitas Asrama', 'Statistik ketersediaan & sisa kuota ranjang asrama.', 'teal', null)}
+            ${cb('token', 'Token Otorisasi', 'Akses PIN rahasia penghapusan data.', 'red', null)}
             
-            ${cb('keuangan', 'Ringkasan Kas', 'Arus pemasukan & pengeluaran bulan ini.', 'emerald')}
-            ${cb('pending', 'Persetujuan Tertunda', 'Daftar pengajuan izin/cuti yang butuh ACC.', 'orange')}
-            ${cb('disiplin', 'Peringkat Disiplin', 'Top 3 Pegawai paling rajin & tepat waktu.', 'blue')}
+            ${cb('keuangan', 'Ringkasan Kas', 'Arus pemasukan & pengeluaran bulan ini.', 'emerald', null)}
+            ${cb('pending', 'Persetujuan Tertunda', 'Daftar pengajuan izin/cuti yang butuh ACC.', 'orange', null)}
+            ${cb('disiplin', 'Peringkat Disiplin', 'Top 3 Pegawai paling rajin & tepat waktu.', 'blue', null)}
             
-            ${cb('pemberitahuan', 'Papan Pemberitahuan', 'Sistem pengumuman realtime antar pegawai.', 'indigo')}
-            ${cb('tugas', 'Tugas Pegawai', 'Modul manajemen tugas harian.', 'amber')}
-            ${cb('kalender', 'Kalender Bulan Ini', 'Cuplikan agenda dan event bulan berjalan.', 'teal')}
-            ${cb('hadirPegawai', 'Kehadiran Pegawai', 'Persentase pegawai yang sudah absen hari ini.', 'emerald')}
-            ${cb('hadirKelas', 'Kehadiran Kelas', 'Pantauan KBM, kehadiran guru pengajar & siswa.', 'blue')}
-            ${cb('tunggakan', 'Siswa Menunggak', 'Daftar top siswa menunggak tagihan terlama.', 'rose')}
-            ${cb('trenTahfidz', 'Tren Tahfidz', 'Ringkasan setoran hafalan harian.', 'teal')}
-            ${cb('trenKepengasuhan', 'Jurnal Asrama', 'Ringkasan jurnal kepengasuhan harian.', 'emerald')}
-            ${cb('notifOrtu', 'Kirim Notif Ortu', 'Kirim pengumuman/tagihan ke portal wali murid.', 'purple')}
+            ${cb('pemberitahuan', 'Papan Pemberitahuan', 'Sistem pengumuman realtime antar pegawai.', 'indigo', 'tugas_pegawai')}
+            ${cb('tugas', 'Tugas Pegawai', 'Modul manajemen tugas harian.', 'amber', 'tugas_pegawai')}
+            ${cb('kalender', 'Kalender Bulan Ini', 'Cuplikan agenda dan event bulan berjalan.', 'teal', null)}
+            ${cb('hadirPegawai', 'Kehadiran Pegawai', 'Persentase pegawai yang sudah absen hari ini.', 'emerald', null)}
+            ${cb('hadirKelas', 'Kehadiran Kelas', 'Pantauan KBM, kehadiran guru pengajar & siswa.', 'blue', null)}
+            ${cb('tunggakan', 'Siswa Menunggak', 'Daftar top siswa menunggak tagihan terlama.', 'rose', 'keuangan_plus')}
+            ${cb('trenTahfidz', 'Tren Tahfidz', 'Ringkasan setoran hafalan harian.', 'teal', 'tahfidz_plus')}
+            ${cb('trenKepengasuhan', 'Jurnal Asrama', 'Ringkasan jurnal kepengasuhan harian.', 'emerald', 'tahfidz_plus')}
+            ${cb('notifOrtu', 'Kirim Notif Ortu', 'Kirim pengumuman/tagihan ke portal wali murid.', 'purple', 'ortu_portal')}
         `;
     }
 };
@@ -613,24 +689,28 @@ window.simpanAturDasbor = async function() {
     } catch(e) { alert("Gagal menyimpan konfigurasi."); btn.innerHTML = 'Simpan Konfigurasi'; btn.disabled = false; }
 };
 
-// ================= FUNGSI NAVIGASI UTAMA =================
 window.navigate = function(page) {
     window.currentPage = page;
     window.renderSidebarMenu(); 
 
     const currentUser = getFreshUser();
-    const isSuperAdmin = currentUser.hakAkses === 'Super Admin' || currentUser.hakAkses === 'Administrator' || currentUser.role === 'admin' || currentUser.username === 'admin';
+    const lembaga = window.appState.lembaga[0] || {};
+    
+    const isSuperAdmin = currentUser.hakAkses === 'Super Admin';
     const isSA_Only = currentUser.hakAkses === 'Super Admin' || currentUser.hakAkses === 'Administrator';
     const isOpTU = currentUser.hakAkses === 'Operator/TU';
+    const isKepala = (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('kepala'));
+    const isHead = isSA_Only || isKepala || (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('ketua'));
     
-    const isHead = isSuperAdmin || (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('kepala') || j.namaJabatan.toLowerCase().includes('ketua'));
     const canPostAnnounce = isSA_Only || isOpTU || isHead;
-
-    const wewenangMatrix = (window.appState && window.appState.lembaga && window.appState.lembaga[0] && window.appState.lembaga[0].wewenangMatrix) ? window.appState.lembaga[0].wewenangMatrix : {};
+    const wewenangMatrix = lembaga.wewenangMatrix || {};
     
     let hasAccess = false;
+    
     if (isSuperAdmin || page === 'dashboard') {
         hasAccess = true;
+    } else if (page === 'ppdb' && isKepala) {
+        hasAccess = true; 
     } else {
         const userJabatans = (currentUser.detailJabatan || []).map(j => j.namaJabatan);
         userJabatans.forEach(jab => {
@@ -648,32 +728,30 @@ window.navigate = function(page) {
     if (titleEl) titleEl.innerText = page.replace('-', ' ').toUpperCase();
     const container = document.getElementById('view-container');
     
+    // --- GEMBOK MODULAR (LAYAR SEGEL PENUH UNTUK HALAMAN UTAMA) ---
+    if (page === 'tugas' && !window.cekLisensi('tugas_pegawai')) return container.innerHTML = window.renderLockedPremiumHTML('Manajemen Tugas Pegawai (Kanban)');
+    if (page === 'ppdb' && !window.cekLisensi('ppdb_online')) return container.innerHTML = window.renderLockedPremiumHTML('Sistem PPDB Online & QRIS');
+    if (page === 'kalender' && !window.cekLisensi('kalender_plus')) return container.innerHTML = window.renderLockedPremiumHTML('Kalender Pendidikan Terpadu');
+    if (page === 'lisensi' && !isSuperAdmin) { alert("Ditolak!"); window.navigate('dashboard'); return; }
+
     if (page === 'dashboard') {
-        const lembaga = window.appState.lembaga[0] || {};
         let savedConfig = lembaga.dashboardConfig || {};
-        
-        if (typeof savedConfig.pegawai === 'boolean') {
-            savedConfig = { 'Global': savedConfig };
-        }
+        if (typeof savedConfig.pegawai === 'boolean') savedConfig = { 'Global': savedConfig };
 
         let config = { pegawai: false, siswa: false, asrama: false, token: false, hadirPegawai: false, hadirKelas: false, kalender: false, pemberitahuan: false, tunggakan: false, tugas: false, keuangan: false, pending: false, disiplin: false, trenTahfidz: false, trenKepengasuhan: false, notifOrtu: false };
         const defConfig = { pegawai: true, siswa: true, asrama: true, token: true, hadirPegawai: true, hadirKelas: true, kalender: true, pemberitahuan: true, tunggakan: true, tugas: true, keuangan: true, pending: true, disiplin: true, trenTahfidz: true, trenKepengasuhan: true, notifOrtu: true };
 
         const userJabs = (currentUser.detailJabatan || []).map(j => j.namaJabatan);
         
-        if (isSuperAdmin && userJabs.length === 0) {
-            Object.assign(config, savedConfig['Global'] || defConfig);
-        } else if (userJabs.length === 0) {
-            Object.assign(config, savedConfig['Global'] || defConfig);
-        } else {
+        if (isSuperAdmin && userJabs.length === 0) { Object.assign(config, savedConfig['Global'] || defConfig); } 
+        else if (userJabs.length === 0) { Object.assign(config, savedConfig['Global'] || defConfig); } 
+        else {
             userJabs.forEach(jab => {
                 const c = savedConfig[jab] || savedConfig['Global'] || defConfig;
-                Object.keys(config).forEach(k => {
-                    if (c[k]) config[k] = true;
-                });
+                Object.keys(config).forEach(k => { if (c[k]) config[k] = true; });
             });
         }
-        
+
         let html = `
         <div class="flex justify-between items-center mb-4 md:mb-6">
             <h2 class="text-xl md:text-3xl font-black text-slate-800 tracking-tight">Ringkasan Sistem</h2>
@@ -726,12 +804,7 @@ window.navigate = function(page) {
                 </div>
             </div>`;
         }
-        html += `</div>`; 
-
-        html += `<div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">`;
-        
-        // KOLOM 1 KIRI
-        html += `<div class="xl:col-span-1 flex flex-col gap-6">`;
+        html += `</div><div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6"><div class="xl:col-span-1 flex flex-col gap-6">`;
         
         if (config.keuangan) {
             html += `
@@ -749,124 +822,125 @@ window.navigate = function(page) {
                 <div class="flex-1 p-2" id="dasbor-pending-list"><div class="text-center p-4 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin"></i> Mengecek...</div></div>
             </div>`;
         }
+        
+        // PEMBERITAHUAN (BUTUH TUGAS PEGAWAI PLUS)
         if (config.pemberitahuan) {
-            html += `
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-[500px]">
-                <div class="bg-indigo-600 text-white p-4 rounded-t-2xl flex justify-between items-center shrink-0">
-                    <h3 class="font-black text-sm uppercase tracking-wider"><i class="fa-solid fa-bullhorn mr-2"></i> Papan Pengumuman</h3>
-                </div>
-                <div class="flex-1 overflow-y-auto custom-scrollbar p-4 bg-slate-50" id="list-pemberitahuan-rtdb">
-                    <div class="text-center p-8 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-2xl mb-2 block"></i>Memuat realtime...</div>
-                </div>
-                ${canPostAnnounce ? `
-                <div class="p-4 border-t border-slate-200 bg-white rounded-b-2xl shrink-0">
-                    <form id="form-pemberitahuan" onsubmit="window.kirimPemberitahuanRTDB(event)">
-                        <input type="text" id="input-judul-pemberitahuan" placeholder="Judul Singkat..." class="w-full border border-slate-200 p-2 rounded-lg text-xs font-bold mb-2 focus:outline-indigo-500 bg-slate-50" required>
-                        <textarea id="input-isi-pemberitahuan" rows="2" placeholder="Tulis pengumuman..." class="w-full border border-slate-200 p-2 rounded-lg text-xs font-medium mb-2 focus:outline-indigo-500 bg-slate-50" required></textarea>
-                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black py-2 rounded-lg shadow-sm transition"><i class="fa-solid fa-paper-plane mr-1"></i> Siarkan (Realtime)</button>
-                    </form>
-                </div>` : ''}
-            </div>`;
+            if (!window.cekLisensi('tugas_pegawai')) {
+                html += `<div class="bg-slate-50 p-8 rounded-2xl border border-slate-200 text-center"><i class="fa-solid fa-lock text-4xl text-slate-300 mb-3"></i><h4 class="font-bold text-slate-500">Papan Pengumuman</h4><span class="text-[10px] text-amber-500 font-bold mt-1 bg-amber-100 px-2 py-0.5 rounded">Segel Premium</span></div>`;
+            } else {
+                html += `
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-[500px]">
+                    <div class="bg-indigo-600 text-white p-4 rounded-t-2xl flex justify-between items-center shrink-0">
+                        <h3 class="font-black text-sm uppercase tracking-wider"><i class="fa-solid fa-bullhorn mr-2"></i> Papan Pengumuman</h3>
+                    </div>
+                    <div class="flex-1 overflow-y-auto custom-scrollbar p-4 bg-slate-50" id="list-pemberitahuan-rtdb">
+                        <div class="text-center p-8 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-2xl mb-2 block"></i>Memuat realtime...</div>
+                    </div>
+                    ${canPostAnnounce ? `
+                    <div class="p-4 border-t border-slate-200 bg-white rounded-b-2xl shrink-0">
+                        <form id="form-pemberitahuan" onsubmit="window.kirimPemberitahuanRTDB(event)">
+                            <input type="text" id="input-judul-pemberitahuan" placeholder="Judul Singkat..." class="w-full border border-slate-200 p-2 rounded-lg text-xs font-bold mb-2 focus:outline-indigo-500 bg-slate-50" required>
+                            <textarea id="input-isi-pemberitahuan" rows="2" placeholder="Tulis pengumuman..." class="w-full border border-slate-200 p-2 rounded-lg text-xs font-medium mb-2 focus:outline-indigo-500 bg-slate-50" required></textarea>
+                            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black py-2 rounded-lg shadow-sm transition"><i class="fa-solid fa-paper-plane mr-1"></i> Siarkan (Realtime)</button>
+                        </form>
+                    </div>` : ''}
+                </div>`;
+            }
         }
 
+        // NOTIF ORTU (BUTUH PORTAL ORTU)
         if (config.notifOrtu && canPostAnnounce) {
-            let anakByKelas = {};
-            (window.appState.anak || []).filter(a => a.statusAkademik !== 'Lulus').forEach(a => {
-                const kls = a.kelas || 'Tanpa Kelas';
-                if(!anakByKelas[kls]) anakByKelas[kls] = [];
-                anakByKelas[kls].push(a);
-            });
-            let chkSiswaHTML = '';
-            Object.keys(anakByKelas).sort().forEach(kls => {
-                const arr = anakByKelas[kls];
-                const safeKls = kls.replace(/\s+/g, '-');
-                chkSiswaHTML += `
-                <div class="mb-2 border border-purple-200 rounded-lg overflow-hidden bg-white shadow-sm">
-                    <label class="flex items-center bg-purple-100 p-2.5 cursor-pointer hover:bg-purple-200 transition">
-                        <input type="checkbox" onchange="window.toggleKelasNotif(this, '${safeKls}')" class="w-4 h-4 text-purple-600 rounded mr-3">
-                        <span class="font-black text-xs text-purple-900 uppercase tracking-wider">Kelas ${kls} <span class="bg-white text-purple-600 px-1.5 py-0.5 rounded text-[9px] ml-1">${arr.length} Anak</span></span>
-                    </label>
-                    <div class="p-2 bg-white max-h-32 overflow-y-auto custom-scrollbar grid grid-cols-1 md:grid-cols-2 gap-1">
-                        ${arr.map(a => `
-                        <label class="flex items-center cursor-pointer hover:bg-purple-50 p-1.5 rounded transition">
-                            <input type="checkbox" name="notif-target-chk" value="${a.id}|${a.nama}" class="w-3.5 h-3.5 text-purple-600 rounded mr-2 notif-chk-${safeKls}">
-                            <span class="text-xs font-bold text-slate-700">${a.nama}</span>
+            if (!window.cekLisensi('ortu_portal')) {
+                html += `<div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 text-center mb-6"><i class="fa-solid fa-lock text-4xl text-slate-300 mb-3"></i><h4 class="font-bold text-slate-500">Notifikasi Portal Ortu</h4><span class="text-[10px] text-amber-500 font-bold mt-1 bg-amber-100 px-2 py-0.5 rounded">Segel Premium</span></div>`;
+            } else {
+                let anakByKelas = {};
+                (window.appState.anak || []).filter(a => a.statusAkademik !== 'Lulus').forEach(a => {
+                    const kls = a.kelas || 'Tanpa Kelas';
+                    if(!anakByKelas[kls]) anakByKelas[kls] = [];
+                    anakByKelas[kls].push(a);
+                });
+                let chkSiswaHTML = '';
+                Object.keys(anakByKelas).sort().forEach(kls => {
+                    const arr = anakByKelas[kls];
+                    const safeKls = kls.replace(/\s+/g, '-');
+                    chkSiswaHTML += `
+                    <div class="mb-2 border border-purple-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                        <label class="flex items-center bg-purple-100 p-2.5 cursor-pointer hover:bg-purple-200 transition">
+                            <input type="checkbox" onchange="window.toggleKelasNotif(this, '${safeKls}')" class="w-4 h-4 text-purple-600 rounded mr-3">
+                            <span class="font-black text-xs text-purple-900 uppercase tracking-wider">Kelas ${kls} <span class="bg-white text-purple-600 px-1.5 py-0.5 rounded text-[9px] ml-1">${arr.length} Anak</span></span>
                         </label>
-                        `).join('')}
+                        <div class="p-2 bg-white max-h-32 overflow-y-auto custom-scrollbar grid grid-cols-1 md:grid-cols-2 gap-1">
+                            ${arr.map(a => `
+                            <label class="flex items-center cursor-pointer hover:bg-purple-50 p-1.5 rounded transition">
+                                <input type="checkbox" name="notif-target-chk" value="${a.id}|${a.nama}" class="w-3.5 h-3.5 text-purple-600 rounded mr-2 notif-chk-${safeKls}">
+                                <span class="text-xs font-bold text-slate-700">${a.nama}</span>
+                            </label>
+                            `).join('')}
+                        </div>
+                    </div>`;
+                });
+
+                html += `
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col mb-6 transition-all duration-500">
+                    <button type="button" id="btn-notif-card" onclick="window.toggleNotifCard()" class="w-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white p-5 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-md border-b-4 border-purple-700 cursor-pointer group">
+                        <div id="notif-cover-content" class="flex flex-col py-10 items-center justify-center transition-all duration-500 w-full">
+                            <i id="notif-icon" class="fa-solid fa-bullhorn text-7xl mb-4 transition-all duration-500 transform group-hover:scale-110 drop-shadow-lg"></i>
+                            <h3 class="font-black text-sm uppercase tracking-wider text-center">Kirim Pemberitahuan / Tagihan Ortu</h3>
+                        </div>
+                    </button>
+                    <div id="body-notif-ortu" class="hidden p-5 md:p-6 bg-slate-50 rounded-b-2xl border-t border-slate-100">
+                        <form id="form-notif-ortu" onsubmit="window.kirimNotifOrtu(event)">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-2">Pilih Target Siswa (Bisa Berdasarkan Kelas)</label>
+                            <div class="mb-5 bg-white p-3 rounded-xl border border-slate-200 max-h-64 overflow-y-auto custom-scrollbar shadow-inner">
+                                ${chkSiswaHTML || '<p class="text-xs font-bold text-slate-400 text-center py-4">Belum ada siswa terdaftar.</p>'}
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Tipe Pemberitahuan</label>
+                                    <select id="notif-ortu-tipe" onchange="window.toggleNotifOrtuTipe()" class="w-full border-2 border-slate-200 p-3 rounded-xl text-xs font-bold focus:outline-purple-500 bg-white cursor-pointer" required>
+                                        <option value="Informasi">Informasi / Pengumuman Biasa</option>
+                                        <option value="Pembelian">Tagihan Pembelian (Butuh Persetujuan)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1" id="lbl-notif-judul">Judul Pengumuman</label>
+                                    <input type="text" id="notif-ortu-judul" placeholder="Cth: Libur Semester Ganjil..." class="w-full border-2 border-slate-200 p-3 rounded-xl text-xs font-bold focus:outline-purple-500 bg-white shadow-sm" required>
+                                </div>
+                            </div>
+                            <div id="notif-ortu-pembelian-area" class="hidden mb-4 bg-purple-50 p-4 rounded-xl border border-purple-200 shadow-inner flex flex-col md:flex-row gap-4 animate-fade-in">
+                                <div class="flex-1">
+                                    <label class="text-[10px] font-bold text-purple-700 uppercase block mb-1">Nama Item Pembelian</label>
+                                    <input type="text" id="notif-ortu-item" placeholder="Cth: Buku Paket Semester 2" class="w-full border border-purple-300 p-3 rounded-lg text-xs font-bold focus:outline-purple-500 bg-white shadow-sm">
+                                </div>
+                                <div class="flex-1">
+                                    <label class="text-[10px] font-bold text-purple-700 uppercase block mb-1">Nominal Harga (Rp)</label>
+                                    <input type="text" id="notif-ortu-nominal" oninput="let v=this.value.replace(/[^0-9]/g,''); this.value=v?Number(v).toLocaleString('id-ID'):''" placeholder="Cth: 150.000" class="w-full border border-purple-300 p-3 rounded-lg text-xs font-black text-purple-700 focus:outline-purple-500 bg-white shadow-sm">
+                                </div>
+                            </div>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Berlaku Sampai Tanggal</label>
+                            <input type="date" id="notif-ortu-expired" class="w-full border-2 border-slate-200 p-3 rounded-xl text-xs font-bold focus:outline-purple-500 bg-white shadow-sm mb-4" required>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Isi Pesan / Keterangan Lengkap</label>
+                            <textarea id="notif-ortu-isi" rows="3" placeholder="Tulis pesan lengkap untuk wali murid..." class="w-full border-2 border-slate-200 p-3 rounded-xl text-xs font-medium mb-6 focus:outline-purple-500 bg-white shadow-sm" required></textarea>
+                            <button type="submit" class="w-full md:w-auto md:px-12 bg-purple-600 hover:bg-purple-700 text-white text-sm font-black py-4 rounded-xl shadow-lg transition transform hover:-translate-y-1 float-right"><i class="fa-solid fa-paper-plane mr-2"></i> Kirim Notifikasi</button>
+                            <div class="clear-both"></div>
+                        </form>
                     </div>
                 </div>`;
-            });
-
-            html += `
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col mb-6 transition-all duration-500">
-                <button type="button" id="btn-notif-card" onclick="window.toggleNotifCard()" class="w-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white p-5 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-md border-b-4 border-purple-700 cursor-pointer group">
-                    <div id="notif-cover-content" class="flex flex-col py-10 items-center justify-center transition-all duration-500 w-full">
-                        <i id="notif-icon" class="fa-solid fa-bullhorn text-7xl mb-4 transition-all duration-500 transform group-hover:scale-110 drop-shadow-lg"></i>
-                        <h3 class="font-black text-sm uppercase tracking-wider text-center">Kirim Pemberitahuan / Tagihan Ortu</h3>
-                    </div>
-                </button>
-                
-                <div id="body-notif-ortu" class="hidden p-5 md:p-6 bg-slate-50 rounded-b-2xl border-t border-slate-100">
-                    <form id="form-notif-ortu" onsubmit="window.kirimNotifOrtu(event)">
-                        <label class="text-[10px] font-bold text-slate-500 uppercase block mb-2">Pilih Target Siswa (Bisa Berdasarkan Kelas)</label>
-                        <div class="mb-5 bg-white p-3 rounded-xl border border-slate-200 max-h-64 overflow-y-auto custom-scrollbar shadow-inner">
-                            ${chkSiswaHTML || '<p class="text-xs font-bold text-slate-400 text-center py-4">Belum ada siswa terdaftar.</p>'}
-                        </div>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Tipe Pemberitahuan</label>
-                                <select id="notif-ortu-tipe" onchange="window.toggleNotifOrtuTipe()" class="w-full border-2 border-slate-200 p-3 rounded-xl text-xs font-bold focus:outline-purple-500 bg-white cursor-pointer" required>
-                                    <option value="Informasi">Informasi / Pengumuman Biasa</option>
-                                    <option value="Pembelian">Tagihan Pembelian (Butuh Persetujuan)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1" id="lbl-notif-judul">Judul Pengumuman</label>
-                                <input type="text" id="notif-ortu-judul" placeholder="Cth: Libur Semester Ganjil..." class="w-full border-2 border-slate-200 p-3 rounded-xl text-xs font-bold focus:outline-purple-500 bg-white shadow-sm" required>
-                            </div>
-                        </div>
-
-                        <div id="notif-ortu-pembelian-area" class="hidden mb-4 bg-purple-50 p-4 rounded-xl border border-purple-200 shadow-inner flex flex-col md:flex-row gap-4 animate-fade-in">
-                            <div class="flex-1">
-                                <label class="text-[10px] font-bold text-purple-700 uppercase block mb-1">Nama Item Pembelian</label>
-                                <input type="text" id="notif-ortu-item" placeholder="Cth: Buku Paket Semester 2" class="w-full border border-purple-300 p-3 rounded-lg text-xs font-bold focus:outline-purple-500 bg-white shadow-sm">
-                            </div>
-                            <div class="flex-1">
-                                <label class="text-[10px] font-bold text-purple-700 uppercase block mb-1">Nominal Harga (Rp)</label>
-                                <input type="text" id="notif-ortu-nominal" oninput="let v=this.value.replace(/[^0-9]/g,''); this.value=v?Number(v).toLocaleString('id-ID'):''" placeholder="Cth: 150.000" class="w-full border border-purple-300 p-3 rounded-lg text-xs font-black text-purple-700 focus:outline-purple-500 bg-white shadow-sm">
-                            </div>
-                        </div>
-                        
-                        <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Berlaku Sampai Tanggal</label>
-                        <input type="date" id="notif-ortu-expired" class="w-full border-2 border-slate-200 p-3 rounded-xl text-xs font-bold focus:outline-purple-500 bg-white shadow-sm mb-4" required>
-                        
-                        <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Isi Pesan / Keterangan Lengkap</label>
-                        <textarea id="notif-ortu-isi" rows="3" placeholder="Tulis pesan lengkap untuk wali murid..." class="w-full border-2 border-slate-200 p-3 rounded-xl text-xs font-medium mb-6 focus:outline-purple-500 bg-white shadow-sm" required></textarea>
-
-                        
-                        <button type="submit" class="w-full md:w-auto md:px-12 bg-purple-600 hover:bg-purple-700 text-white text-sm font-black py-4 rounded-xl shadow-lg transition transform hover:-translate-y-1 float-right"><i class="fa-solid fa-paper-plane mr-2"></i> Kirim Notifikasi</button>
-                        <div class="clear-both"></div>
-                    </form>
-                </div>
-            </div>`;
+            }
         }
-        
 
         if (config.tugas) {
+            let clk = window.cekLisensi('tugas_pegawai') ? `onclick="window.navigate('tugas')"` : '';
             html += `
-            <div class="bg-amber-50 rounded-2xl shadow-sm border border-amber-200 p-5 flex items-center justify-between cursor-pointer hover:bg-amber-100 transition transform hover:-translate-y-1" onclick="window.navigate('tugas')">
+            <div class="${window.cekLisensi('tugas_pegawai')?'bg-amber-50 cursor-pointer hover:bg-amber-100':'bg-slate-50 cursor-not-allowed opacity-70'} rounded-2xl shadow-sm border border-amber-200 p-5 flex items-center justify-between transition transform hover:-translate-y-1" ${clk}>
                 <div>
-                    <h3 class="font-black text-amber-800 text-sm"><i class="fa-solid fa-list-check mr-1 text-amber-600"></i> Modul Tugas Pegawai</h3>
-                    <p class="text-[11px] font-bold text-amber-600 mt-1" id="dasbor-tugas-stats"><i class="fa-solid fa-circle-notch fa-spin"></i> Menghitung...</p>
+                    <h3 class="font-black ${window.cekLisensi('tugas_pegawai')?'text-amber-800':'text-slate-500'} text-sm"><i class="fa-solid ${window.cekLisensi('tugas_pegawai')?'fa-list-check':'fa-lock'} mr-1 ${window.cekLisensi('tugas_pegawai')?'text-amber-600':'text-amber-500'}"></i> Modul Tugas Pegawai</h3>
+                    <p class="text-[11px] font-bold ${window.cekLisensi('tugas_pegawai')?'text-amber-600':'text-slate-400'} mt-1" id="dasbor-tugas-stats">${window.cekLisensi('tugas_pegawai')?'<i class="fa-solid fa-circle-notch fa-spin"></i> Menghitung...':'<span class="bg-amber-100 px-2 py-0.5 rounded text-[10px] text-amber-500">Segel Premium</span>'}</p>
                 </div>
-                <i class="fa-solid fa-person-digging text-4xl text-amber-300"></i>
+                <i class="fa-solid fa-person-digging text-4xl ${window.cekLisensi('tugas_pegawai')?'text-amber-300':'text-slate-300'}"></i>
             </div>`;
         }
-        html += `</div>`; 
-
-        // KOLOM 2 & 3 KANAN
-        html += `<div class="xl:col-span-2 flex flex-col gap-6">`;
+        html += `</div><div class="xl:col-span-2 flex flex-col gap-6">`;
         
         if (config.hadirPegawai || config.disiplin) {
             html += `<div class="grid grid-cols-1 md:grid-cols-2 gap-6">`;
@@ -901,24 +975,32 @@ window.navigate = function(page) {
         if (config.trenTahfidz || config.trenKepengasuhan) {
             html += `<div class="grid grid-cols-1 md:grid-cols-2 gap-6">`;
             if (config.trenTahfidz) {
-                html += `
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-0 flex flex-col">
-                    <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-teal-50 rounded-t-2xl">
-                        <h3 class="font-black text-teal-800 text-sm uppercase tracking-wider"><i class="fa-solid fa-book-quran mr-1"></i> Tren Tahfidz Harian</h3>
-                        <button onclick="window.navigate('tahfidz')" class="text-[10px] bg-teal-200 text-teal-800 px-2 py-1 rounded font-black hover:bg-teal-600 hover:text-white transition">Lihat</button>
-                    </div>
-                    <div class="flex-1 overflow-y-auto custom-scrollbar p-2 max-h-64" id="dasbor-tahfidz-list"><div class="text-center p-4 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin mb-2"></i><br>Kalkulasi...</div></div>
-                </div>`;
+                if(!window.cekLisensi('tahfidz_plus')) {
+                    html += `<div class="bg-slate-50 border border-slate-200 p-8 rounded-2xl text-center flex flex-col items-center justify-center opacity-70"><i class="fa-solid fa-lock text-4xl text-slate-300 mb-2"></i><h4 class="font-bold text-slate-500">Tren Tahfidz Harian</h4><span class="text-[10px] font-bold text-amber-500 mt-1 bg-amber-100 px-2 py-0.5 rounded">Segel Premium</span></div>`;
+                } else {
+                    html += `
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-0 flex flex-col">
+                        <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-teal-50 rounded-t-2xl">
+                            <h3 class="font-black text-teal-800 text-sm uppercase tracking-wider"><i class="fa-solid fa-book-quran mr-1"></i> Tren Tahfidz Harian</h3>
+                            <button onclick="window.navigate('tahfidz')" class="text-[10px] bg-teal-200 text-teal-800 px-2 py-1 rounded font-black hover:bg-teal-600 hover:text-white transition">Lihat</button>
+                        </div>
+                        <div class="flex-1 overflow-y-auto custom-scrollbar p-2 max-h-64" id="dasbor-tahfidz-list"><div class="text-center p-4 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin mb-2"></i><br>Kalkulasi...</div></div>
+                    </div>`;
+                }
             }
             if (config.trenKepengasuhan) {
-                html += `
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-0 flex flex-col">
-                    <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-emerald-50 rounded-t-2xl">
-                        <h3 class="font-black text-emerald-800 text-sm uppercase tracking-wider"><i class="fa-solid fa-bed mr-1"></i> Jurnal Asrama Harian</h3>
-                        <button onclick="window.navigate('kepengasuhan')" class="text-[10px] bg-emerald-200 text-emerald-800 px-2 py-1 rounded font-black hover:bg-emerald-600 hover:text-white transition">Lihat</button>
-                    </div>
-                    <div class="flex-1 overflow-y-auto custom-scrollbar p-2 max-h-64" id="dasbor-asrama-list"><div class="text-center p-4 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin mb-2"></i><br>Kalkulasi...</div></div>
-                </div>`;
+                if(!window.cekLisensi('tahfidz_plus')) {
+                    html += `<div class="bg-slate-50 border border-slate-200 p-8 rounded-2xl text-center flex flex-col items-center justify-center opacity-70"><i class="fa-solid fa-lock text-4xl text-slate-300 mb-2"></i><h4 class="font-bold text-slate-500">Jurnal Asrama Harian</h4><span class="text-[10px] font-bold text-amber-500 mt-1 bg-amber-100 px-2 py-0.5 rounded">Segel Premium</span></div>`;
+                } else {
+                    html += `
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-0 flex flex-col">
+                        <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-emerald-50 rounded-t-2xl">
+                            <h3 class="font-black text-emerald-800 text-sm uppercase tracking-wider"><i class="fa-solid fa-bed mr-1"></i> Jurnal Asrama Harian</h3>
+                            <button onclick="window.navigate('kepengasuhan')" class="text-[10px] bg-emerald-200 text-emerald-800 px-2 py-1 rounded font-black hover:bg-emerald-600 hover:text-white transition">Lihat</button>
+                        </div>
+                        <div class="flex-1 overflow-y-auto custom-scrollbar p-2 max-h-64" id="dasbor-asrama-list"><div class="text-center p-4 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin mb-2"></i><br>Kalkulasi...</div></div>
+                    </div>`;
+                }
             }
             html += `</div>`;
         }
@@ -926,24 +1008,32 @@ window.navigate = function(page) {
         if (config.tunggakan || config.kalender) {
             html += `<div class="grid grid-cols-1 md:grid-cols-2 gap-6">`;
             if (config.tunggakan) {
-                html += `
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-0 flex flex-col">
-                    <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-rose-50 rounded-t-2xl">
-                        <h3 class="font-black text-rose-800 text-sm uppercase tracking-wider"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Top Tunggakan SPP</h3>
-                        <button onclick="window.navigate('keuangan')" class="text-[10px] bg-rose-200 text-rose-800 px-2 py-1 rounded font-black hover:bg-rose-600 hover:text-white transition">Lihat Semua</button>
-                    </div>
-                    <div class="flex-1 overflow-y-auto custom-scrollbar p-2 max-h-64" id="dasbor-tunggakan-list"><div class="text-center p-4 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin mb-2"></i><br>Kalkulasi...</div></div>
-                </div>`;
+                if (!window.cekLisensi('keuangan_plus')) {
+                    html += `<div class="bg-slate-50 border border-slate-200 p-8 rounded-2xl text-center flex flex-col items-center justify-center opacity-70"><i class="fa-solid fa-lock text-4xl text-slate-300 mb-2"></i><h4 class="font-bold text-slate-500">Tunggakan SPP</h4><span class="text-[10px] font-bold text-amber-500 mt-1 bg-amber-100 px-2 py-0.5 rounded">Segel Premium</span></div>`;
+                } else {
+                    html += `
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-0 flex flex-col">
+                        <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-rose-50 rounded-t-2xl">
+                            <h3 class="font-black text-rose-800 text-sm uppercase tracking-wider"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Top Tunggakan SPP</h3>
+                            <button onclick="window.navigate('keuangan')" class="text-[10px] bg-rose-200 text-rose-800 px-2 py-1 rounded font-black hover:bg-rose-600 hover:text-white transition">Lihat Semua</button>
+                        </div>
+                        <div class="flex-1 overflow-y-auto custom-scrollbar p-2 max-h-64" id="dasbor-tunggakan-list"><div class="text-center p-4 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin mb-2"></i><br>Kalkulasi...</div></div>
+                    </div>`;
+                }
             }
             if (config.kalender) {
-                html += `
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
-                    <div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
-                        <h3 class="font-black text-teal-800 text-base"><i class="fa-solid fa-calendar-days text-teal-600 mr-2"></i> Kalender <span id="dashboard-kalender-month-label">Bulan Ini</span></h3>
-                        <button onclick="window.navigate('kalender')" class="text-[10px] bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-1.5 rounded-lg font-black hover:bg-teal-600 hover:text-white transition shadow-sm">Buka Kalender</button>
-                    </div>
-                    <div id="dashboard-kalender-container" class="overflow-hidden"></div>
-                </div>`;
+                if (!window.cekLisensi('kalender_plus')) {
+                    html += `<div class="bg-slate-50 border border-slate-200 p-8 rounded-2xl text-center flex flex-col items-center justify-center opacity-70"><i class="fa-solid fa-lock text-4xl text-slate-300 mb-2"></i><h4 class="font-bold text-slate-500">Kalender Pendidikan</h4><span class="text-[10px] font-bold text-amber-500 mt-1 bg-amber-100 px-2 py-0.5 rounded">Segel Premium</span></div>`;
+                } else {
+                    html += `
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                        <div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
+                            <h3 class="font-black text-teal-800 text-base"><i class="fa-solid fa-calendar-days text-teal-600 mr-2"></i> Kalender <span id="dashboard-kalender-month-label">Bulan Ini</span></h3>
+                            <button onclick="window.navigate('kalender')" class="text-[10px] bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-1.5 rounded-lg font-black hover:bg-teal-600 hover:text-white transition shadow-sm">Buka Kalender</button>
+                        </div>
+                        <div id="dashboard-kalender-container" class="overflow-hidden"></div>
+                    </div>`;
+                }
             }
             html += `</div>`;
         }
@@ -953,17 +1043,17 @@ window.navigate = function(page) {
         container.innerHTML = html;
         
         if (config.token && isHead) window.listenTokenOtorisasi();
-        if (config.pemberitahuan) window.initPemberitahuanRTDB();
+        if (window.cekLisensi('tugas_pegawai') && config.pemberitahuan) window.initPemberitahuanRTDB();
         if (config.hadirPegawai) window.loadHadirPegawaiDasbor();
-        if (config.tunggakan) window.loadTunggakanDasbor();
-        if (config.tugas && typeof window.loadTugasDasbor === 'function') window.loadTugasDasbor();
+        if (window.cekLisensi('keuangan_plus') && config.tunggakan) window.loadTunggakanDasbor();
+        if (window.cekLisensi('tugas_pegawai') && config.tugas && typeof window.loadTugasDasbor === 'function') window.loadTugasDasbor();
         if (config.hadirKelas && typeof window.loadDashboardKehadiran === 'function') window.loadDashboardKehadiran();
-        if (config.kalender && typeof window.renderDashboardKalender === 'function') setTimeout(window.renderDashboardKalender, 50);
+        if (window.cekLisensi('kalender_plus') && config.kalender && typeof window.renderDashboardKalender === 'function') setTimeout(window.renderDashboardKalender, 50);
         
         if (config.keuangan || config.pending || config.disiplin) {
             window.loadDashboardAdvancedWidgets();
         }
-        if (config.trenTahfidz || config.trenKepengasuhan) {
+        if (window.cekLisensi('tahfidz_plus') && (config.trenTahfidz || config.trenKepengasuhan)) {
             window.loadDashboardSantriWidgets(config.trenTahfidz, config.trenKepengasuhan);
         }
 
@@ -976,7 +1066,9 @@ window.navigate = function(page) {
     } else if (page === 'akademik') { renderHalamanAkademik(container); 
     } else if (page === 'kepengasuhan') { renderHalamanKepengasuhan(container); 
     } else if (page === 'tahfidz') { renderHalamanTahfidz(container); 
-    } else if (page === 'raport') { renderHalamanRaport(container); // <-- BARU
+    } else if (page === 'raport') { renderHalamanRaport(container); 
     } else if (page === 'keuangan') { renderHalamanKeuangan(container); 
+    } else if (page === 'ppdb') { renderHalamanPPDB(container); 
+    } else if (page === 'lisensi') { renderHalamanLisensi(container); 
     }
 };
