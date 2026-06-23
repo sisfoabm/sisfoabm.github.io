@@ -16,13 +16,25 @@ window.getSemesterFromBulan = function(bulanStr) {
 
 window.calcPredikat = function(inputEl) {
     const val = Number(inputEl.value);
-    let pred = ''; let cls = '';
-    if (val >= 90) { pred = 'A (Sangat Baik)'; cls = 'bg-emerald-100 text-emerald-700'; }
-    else if (val >= 80) { pred = 'B (Baik)'; cls = 'bg-blue-100 text-blue-700'; }
-    else if (val >= 70) { pred = 'C (Cukup)'; cls = 'bg-amber-100 text-amber-700'; }
-    else { pred = 'D (Kurang)'; cls = 'bg-rose-100 text-rose-700'; }
-    
     const row = inputEl.closest('.raport-mapel-row');
+    
+    let kkm = 75; 
+    if (row) {
+        const kkmEl = row.querySelector('.mapel-kkm');
+        if (kkmEl && kkmEl.value) kkm = Number(kkmEl.value);
+    }
+
+    const interval = (100 - kkm) / 3;
+    const batasC = kkm;
+    const batasB = kkm + interval;
+    const batasA = kkm + (interval * 2);
+
+    let pred = ''; let cls = '';
+    if (val >= Math.round(batasA)) { pred = 'A (Sangat Baik)'; cls = 'bg-emerald-100 text-emerald-700'; }
+    else if (val >= Math.round(batasB)) { pred = 'B (Baik)'; cls = 'bg-blue-100 text-blue-700'; }
+    else if (val >= batasC) { pred = 'C (Cukup)'; cls = 'bg-amber-100 text-amber-700'; }
+    else { pred = 'D (Perlu Bimbingan)'; cls = 'bg-rose-100 text-rose-700'; } 
+    
     if (row) {
         const pEl = row.querySelector('.mapel-predikat');
         if(pEl) { pEl.value = pred; pEl.className = `mapel-predikat w-full border p-1.5 rounded text-xs text-center font-black cursor-not-allowed ${cls}`; }
@@ -33,6 +45,9 @@ window.calcPredikat = function(inputEl) {
 // INISIALISASI & FILTER HAK AKSES
 // ==========================================
 export async function renderHalamanRaport(container) {
+    // --- GEMBOK MODULAR ---
+    const hasRaportPlus = window.cekLisensi('raport_plus');
+
     const currentUser = window.currentUser || {};
     const isSA_Admin = ['Super Admin', 'Administrator'].includes(currentUser.hakAkses);
     const isTU = currentUser.hakAkses === 'Operator/TU';
@@ -43,9 +58,8 @@ export async function renderHalamanRaport(container) {
     const canInputMapel = isGuru || isSA_Admin || isTU;
     const canInputTahfidz = isMusyrif || isSA_Admin || isTU;
     const canPreview = isWaliKelas || isSA_Admin || isTU;
-    const canArsip = isSA_Admin || isTU;
+    const canArsip = isSA_Admin || isTU; // Tampilkan selalu, kita gembok isi halamannya
 
-    // Tetapkan Tab Default Berdasarkan Akses
     if (!['input_mapel','input_tahfidz','preview','arsip'].includes(window.currentRaportTab)) {
         if (canInputMapel) window.currentRaportTab = 'input_mapel';
         else if (canInputTahfidz) window.currentRaportTab = 'input_tahfidz';
@@ -57,7 +71,7 @@ export async function renderHalamanRaport(container) {
     if (canInputMapel) tabs += `<button onclick="window.switchRaportTab('input_mapel')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'input_mapel' ? 'bg-blue-600 text-white border-b-4 border-blue-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-pen-nib mr-2"></i> Input Nilai Mapel (Guru)</button>`;
     if (canInputTahfidz) tabs += `<button onclick="window.switchRaportTab('input_tahfidz')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'input_tahfidz' ? 'bg-teal-600 text-white border-b-4 border-teal-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-book-quran mr-2"></i> Input Raport Tahfidz</button>`;
     if (canPreview) tabs += `<button onclick="window.switchRaportTab('preview')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'preview' ? 'bg-indigo-600 text-white border-b-4 border-indigo-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-file-signature mr-2"></i> Preview & Cetak (Wali Kelas)</button>`;
-    if (canArsip) tabs += `<button onclick="window.switchRaportTab('arsip')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'arsip' ? 'bg-slate-800 text-white border-b-4 border-slate-800 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-box-archive mr-2"></i> Arsip Raport (Admin)</button>`;
+    if (canArsip) tabs += `<button onclick="window.switchRaportTab('arsip')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'arsip' ? 'bg-slate-800 text-white border-b-4 border-slate-800 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-box-archive mr-2"></i> Arsip Raport ${!hasRaportPlus ? '<i class="fa-solid fa-lock text-amber-500 ml-2 text-xs" title="Tersegel Premium"></i>' : ''}</button>`;
 
     container.innerHTML = `
         <div class="mb-6 flex overflow-x-auto border-b-4 border-slate-200 gap-2 custom-scrollbar pr-4">${tabs}</div>
@@ -67,7 +81,10 @@ export async function renderHalamanRaport(container) {
     if (window.currentRaportTab === 'input_mapel') window.renderInputMapel();
     else if (window.currentRaportTab === 'input_tahfidz') window.renderInputTahfidz();
     else if (window.currentRaportTab === 'preview') window.renderPreviewRaport();
-    else if (window.currentRaportTab === 'arsip') window.renderArsipRaport();
+    else if (window.currentRaportTab === 'arsip') {
+        if (!hasRaportPlus) document.getElementById('raport-content-area').innerHTML = window.renderLockedPremiumHTML('Pangkalan Arsip Raport Terpusat');
+        else window.renderArsipRaport();
+    }
 }
 
 window.switchRaportTab = function(tab) {
@@ -78,86 +95,131 @@ window.switchRaportTab = function(tab) {
 // TAB 1: INPUT NILAI MAPEL (GURU)
 // ==========================================
 window.toggleBulkInputMapel = function() {
-    const isBulk = document.getElementById('mapel-mode-bulk').checked;
+    const isBulk = document.getElementById('mapel-mode-bulk')?.checked;
     if(isBulk) {
         document.getElementById('mapel-single-area').classList.add('hidden');
         document.getElementById('mapel-bulk-area').classList.remove('hidden');
     } else {
         document.getElementById('mapel-single-area').classList.remove('hidden');
-        document.getElementById('mapel-bulk-area').classList.add('hidden');
+        if(document.getElementById('mapel-bulk-area')) document.getElementById('mapel-bulk-area').classList.add('hidden');
     }
 };
 
 window.renderInputMapel = function() {
+    const lembaga = window.appState.lembaga[0] || {};
+    // --- GEMBOK MODULAR ---
+    const isPremium = (lembaga.lisensiFitur || []).includes('raport_plus');
+
     const area = document.getElementById('raport-content-area');
     const anakList = (window.appState.anak || []).filter(a => a.statusAkademik !== 'Lulus').sort((a,b) => (a.nama||'').localeCompare(b.nama||''));
     const optAnak = anakList.map(a => `<option value="${a.id}|${a.nama}">${a.nama} (${a.kelas || '-'})</option>`).join('');
     
-    const mapelDefault = ['Pendidikan Agama Islam', 'Pendidikan Pancasila', 'Bahasa Indonesia', 'Matematika', 'Ilmu Pengetahuan Alam', 'Ilmu Pengetahuan Sosial', 'Bahasa Inggris', 'Pendidikan Jasmani', 'Seni Budaya', 'Prakarya', 'Muatan Lokal'];
-    const optMapel = mapelDefault.map(m => `<option value="${m}">${m}</option>`).join('');
+    const currentUser = window.currentUser || {};
+    
+    let daftarMapelLembaga = [];
+    let mapelRaw = lembaga.daftarMapel || lembaga.mataPelajaran || ''; 
+    if (Array.isArray(mapelRaw)) {
+        daftarMapelLembaga = mapelRaw.map(m => typeof m === 'string' ? m : m.nama);
+    } else if (typeof mapelRaw === 'string' && mapelRaw.trim() !== '') {
+        daftarMapelLembaga = mapelRaw.split(',').map(m => m.trim());
+    }
+
+    if (daftarMapelLembaga.length === 0) {
+        daftarMapelLembaga = ['Pendidikan Agama Islam', 'Pendidikan Pancasila', 'Bahasa Indonesia', 'Matematika', 'Ilmu Pengetahuan Alam', 'Ilmu Pengetahuan Sosial', 'Bahasa Inggris', 'Pendidikan Jasmani', 'Seni Budaya', 'Prakarya', 'Muatan Lokal'];
+    }
+
+    let mapelGuruIni = [];
+    (currentUser.detailJabatan || []).forEach(j => {
+        if (j.mapel) {
+            const mapels = typeof j.mapel === 'string' ? j.mapel.split(',').map(m=>m.trim()) : j.mapel;
+            mapels.forEach(m => { if(!mapelGuruIni.includes(m)) mapelGuruIni.push(m); });
+        }
+    });
+
+    let optMapel = '';
+    if (mapelGuruIni.length > 0) {
+        optMapel = mapelGuruIni.map(m => `<option value="${m}">${m}</option>`).join('');
+    } else {
+        optMapel = daftarMapelLembaga.map(m => `<option value="${m}">${m}</option>`).join('');
+    }
 
     const bulkRows = anakList.map((a, i) => `
         <tr data-id="${a.id}" data-nama="${a.nama}" class="border-b border-slate-200 hover:bg-slate-50 transition raport-mapel-row">
             <td class="p-2 text-center font-bold text-slate-500">${i+1}</td>
-            <td class="p-2 font-black text-slate-800">${a.nama}</td>
-            <td class="p-2 bg-blue-50/30"><input type="number" class="mapel-kkm w-full border border-blue-200 p-1.5 rounded text-xs text-center font-bold bg-white" placeholder="KKM" value="75"></td>
-            <td class="p-2 bg-blue-50/30"><input type="number" class="mapel-nilai w-full border border-blue-200 p-1.5 rounded text-xs text-center font-black text-blue-700 bg-white" placeholder="Nilai" oninput="window.calcPredikat(this)"></td>
+            <td class="p-2 font-black text-slate-800">${a.nama} <span class="text-[9px] bg-slate-100 text-slate-500 px-1.5 rounded ml-1 border">Kls ${a.kelas||'-'}</span></td>
+            <td class="p-2 bg-blue-50/30"><input type="number" class="mapel-kkm w-full border border-blue-200 p-1.5 rounded text-xs text-center font-bold bg-white focus:outline-blue-500 focus:bg-blue-50" placeholder="KKM" value="75"></td>
+            <td class="p-2 bg-blue-50/30"><input type="number" class="mapel-nilai w-full border border-blue-200 p-1.5 rounded text-xs text-center font-black text-blue-700 bg-white focus:outline-blue-500 focus:bg-blue-50" placeholder="Nilai" oninput="window.calcPredikat(this)"></td>
             <td class="p-2 bg-blue-50/30"><input type="text" class="mapel-predikat w-full border border-blue-200 p-1.5 rounded text-xs text-center font-black bg-slate-100 text-slate-400 cursor-not-allowed" placeholder="Otomatis" readonly></td>
         </tr>
     `).join('');
 
+    // --- GEMBOK MODULAR: HIDE CBT & BULK TOGGLE ---
+    const btnCBT = isPremium ? `<button type="button" onclick="alert('CBT API siap disambungkan!')" class="bg-purple-100 text-purple-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-purple-200 transition shadow-sm"><i class="fa-solid fa-laptop-code mr-1"></i> Tarik Nilai CBT</button>` : `<button type="button" class="bg-slate-100 text-slate-400 px-3 py-2 rounded-lg text-xs font-bold cursor-not-allowed shadow-sm" title="Integrasi CBT Tersedia di Raport Plus"><i class="fa-solid fa-lock mr-1"></i> Tarik CBT</button>`;
+    
+    const toggleBulk = isPremium ? `
+        <label class="flex items-center cursor-pointer bg-white px-3 py-2 rounded-lg border border-blue-200 hover:bg-blue-100 transition shadow-sm w-full md:w-auto justify-center">
+            <input type="checkbox" id="mapel-mode-bulk" onchange="window.toggleBulkInputMapel()" class="mr-2 w-4 h-4 text-blue-600 rounded">
+            <span class="text-xs font-bold text-blue-800">Mode Tabel Kelas (Input Massal)</span>
+        </label>
+    ` : `
+        <div class="flex items-center bg-slate-100 px-3 py-2 rounded-lg border border-slate-200 shadow-sm w-full md:w-auto justify-center opacity-70 cursor-not-allowed" title="Input Massal Tersedia di Raport Plus">
+            <i class="fa-solid fa-lock text-slate-400 mr-2"></i>
+            <span class="text-xs font-bold text-slate-500">Mode Input Massal</span>
+        </div>
+    `;
+
     area.innerHTML = `
         <div class="bg-blue-50 p-6 md:p-8 rounded-2xl shadow-sm mb-6 border-t-4 border-blue-500 relative overflow-hidden">
-            <div class="flex justify-between items-center mb-6 border-b border-blue-200 pb-4">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-blue-200 pb-4 gap-4">
                 <h2 class="text-xl font-black text-blue-900"><i class="fa-solid fa-pen-nib mr-2 text-blue-500"></i> Setor Nilai Mata Pelajaran</h2>
-                <label class="flex items-center cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-100 transition shadow-sm">
-                    <input type="checkbox" id="mapel-mode-bulk" onchange="window.toggleBulkInputMapel()" class="mr-2 w-4 h-4 text-blue-600 rounded">
-                    <span class="text-xs font-bold text-blue-800">Input Massal (Tabel Kelas)</span>
-                </label>
+                <div class="flex gap-2 w-full md:w-auto">
+                    ${btnCBT}
+                    ${toggleBulk}
+                </div>
             </div>
             
             <form id="form-input-mapel" onsubmit="window.simpanInputMapel(event)">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div>
                         <label class="text-xs font-black text-slate-500 uppercase block mb-1">Bulan & Tahun Evaluasi</label>
-                        <input type="month" id="mapel-bulan" onchange="document.getElementById('lbl-semester-mapel').innerText = window.getSemesterFromBulan(this.value)" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-blue-900 focus:outline-blue-500 bg-white" required>
-                        <p class="text-[10px] font-black text-blue-600 mt-1" id="lbl-semester-mapel">Pilih Bulan Terlebih Dahulu</p>
+                        <input type="month" id="mapel-bulan" onchange="document.getElementById('lbl-semester-mapel').innerText = window.getSemesterFromBulan(this.value)" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-blue-900 focus:outline-blue-500 bg-white cursor-pointer" required>
+                        <p class="text-[10px] font-black text-blue-600 mt-1"><i class="fa-solid fa-info-circle mr-1"></i> <span id="lbl-semester-mapel">Pilih Bulan Terlebih Dahulu</span></p>
                     </div>
                     <div>
-                        <label class="text-xs font-black text-slate-500 uppercase block mb-1">Pilih Mata Pelajaran (Yang Anda Ampu)</label>
-                        <select id="mapel-nama" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-blue-900 focus:outline-blue-500 bg-white" required>
+                        <label class="text-xs font-black text-slate-500 uppercase block mb-1">Pilih Mata Pelajaran ${mapelGuruIni.length > 0 ? '<span class="text-emerald-500">(Otomatis Sesuai Jabatan Anda)</span>' : ''}</label>
+                        <select id="mapel-nama" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-blue-900 focus:outline-blue-500 bg-white cursor-pointer" required>
                             <option value="">-- Pilih Mapel --</option>${optMapel}
                         </select>
                     </div>
                 </div>
 
-                <div id="mapel-single-area" class="bg-white/60 p-4 rounded-xl shadow-sm border border-white mb-6 raport-mapel-row">
+                <div id="mapel-single-area" class="bg-white/60 p-5 rounded-xl shadow-sm border border-white mb-6 raport-mapel-row">
                     <label class="text-xs font-black text-slate-500 uppercase block mb-2">Target Siswa</label>
-                    <select id="mapel-siswa-single" class="w-full border-2 border-blue-100 p-3 rounded-xl font-bold text-blue-900 focus:outline-blue-500 bg-white mb-4">
+                    <select id="mapel-siswa-single" class="w-full border-2 border-blue-100 p-3 rounded-xl font-bold text-blue-900 focus:outline-blue-500 bg-white mb-4 cursor-pointer">
                         <option value="">-- Pilih Satu Siswa --</option>${optAnak}
                     </select>
                     <div class="grid grid-cols-3 gap-4">
-                        <div><label class="text-[10px] font-bold text-slate-500 uppercase block">KKM</label><input type="number" id="mapel-kkm-single" class="mapel-kkm w-full border-2 p-2.5 rounded-lg text-sm font-bold text-center" value="75"></div>
-                        <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Nilai Akhir</label><input type="number" id="mapel-nilai-single" class="mapel-nilai w-full border-2 border-blue-300 p-2.5 rounded-lg text-sm font-black text-blue-700 bg-blue-50 text-center" oninput="window.calcPredikat(this)"></div>
-                        <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Predikat</label><input type="text" id="mapel-predikat-single" class="mapel-predikat w-full border-2 p-2.5 rounded-lg text-sm font-black bg-slate-100 text-center cursor-not-allowed" readonly></div>
+                        <div><label class="text-[10px] font-bold text-slate-500 uppercase block">KKM</label><input type="number" id="mapel-kkm-single" class="mapel-kkm w-full border-2 p-3 rounded-lg text-sm font-bold text-center focus:outline-blue-500" value="75"></div>
+                        <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Nilai Akhir</label><input type="number" id="mapel-nilai-single" class="mapel-nilai w-full border-2 border-blue-300 p-3 rounded-lg text-sm font-black text-blue-700 bg-blue-50 text-center focus:outline-blue-500" oninput="window.calcPredikat(this)"></div>
+                        <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Predikat</label><input type="text" id="mapel-predikat-single" class="mapel-predikat w-full border-2 p-3 rounded-lg text-sm font-black bg-slate-100 text-center cursor-not-allowed" readonly></div>
                     </div>
                 </div>
 
+                ${isPremium ? `
                 <div id="mapel-bulk-area" class="hidden bg-white border border-slate-200 p-2 rounded-xl shadow-inner mb-6 overflow-x-auto custom-scrollbar">
-                    <table class="w-full text-left text-sm whitespace-nowrap min-w-[600px]">
+                    <table class="w-full text-left text-sm whitespace-nowrap min-w-[700px]">
                         <thead>
                             <tr class="bg-blue-100 border-b border-blue-200">
                                 <th class="p-3 text-center text-xs font-black text-blue-800 w-12">No</th>
                                 <th class="p-3 text-xs font-black text-blue-800">Nama Siswa</th>
                                 <th class="p-3 text-center text-xs font-black text-blue-800 w-24">KKM</th>
-                                <th class="p-3 text-center text-xs font-black text-blue-800 w-24">Nilai</th>
+                                <th class="p-3 text-center text-xs font-black text-blue-800 w-28">Nilai Mapel</th>
                                 <th class="p-3 text-center text-xs font-black text-blue-800 w-32">Predikat</th>
                             </tr>
                         </thead>
-                        <tbody id="tbody-mapel-bulk">${bulkRows || '<tr><td colspan="5" class="text-center text-slate-400 p-4 font-bold">Tidak ada siswa aktif.</td></tr>'}</tbody>
+                        <tbody id="tbody-mapel-bulk">${bulkRows || '<tr><td colspan="5" class="text-center text-slate-400 p-6 font-bold">Tidak ada siswa aktif.</td></tr>'}</tbody>
                     </table>
-                    <p class="text-[10px] text-slate-400 mt-2 font-bold text-center"><i class="fa-solid fa-circle-info mr-1"></i> Biarkan kosong nilai santri yang tidak mengikuti ujian. Sistem hanya menyimpan baris yang diisi nilainya.</p>
-                </div>
+                </div>` : ''}
 
                 <button type="submit" id="btn-simpan-input-mapel" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-black px-10 py-4 rounded-xl shadow-lg transition transform hover:-translate-y-1 text-lg float-right"><i class="fa-solid fa-paper-plane mr-2"></i> Setor Nilai</button>
                 <div class="clear-both"></div>
@@ -172,7 +234,7 @@ window.simpanInputMapel = async function(e) {
 
     const bulan = document.getElementById('mapel-bulan').value;
     const mapel = document.getElementById('mapel-nama').value;
-    const isBulk = document.getElementById('mapel-mode-bulk').checked;
+    const isBulk = document.getElementById('mapel-mode-bulk')?.checked;
     let payloads = [];
 
     if (isBulk) {
@@ -343,6 +405,36 @@ window.simpanInputTahfidz = async function(e) {
 };
 
 // ==========================================
+// FUNGSI SINKRON ABSENSI SISWA (PREMIUM ONLY)
+// ==========================================
+window.tarikAbsensiSiswa = async function(idSiswa, bulan) {
+    if (typeof Swal !== 'undefined') Swal.fire({title: 'Mensinkronisasi Data...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+    try {
+        const q = query(collection(db, "AbsensiSiswa")); 
+        const snap = await getDocs(q);
+        let s = 0, i = 0, a = 0;
+        
+        snap.forEach(doc => {
+            const data = doc.data();
+            if(data.tanggal && data.tanggal.startsWith(bulan) && data.detailSiswa) {
+                const status = data.detailSiswa.find(x => x.id === idSiswa)?.status;
+                if(status === 'Sakit') s++;
+                if(status === 'Izin') i++;
+                if(status === 'Alpa') a++;
+            }
+        });
+        
+        document.getElementById('draft-sakit').value = s;
+        document.getElementById('draft-izin').value = i;
+        document.getElementById('draft-alpa').value = a;
+        
+        if (typeof Swal !== 'undefined') Swal.fire('Berhasil!', 'Data kehadiran ditarik dari jurnal absensi kelas.', 'success');
+    } catch(e) {
+        if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal menarik data kehadiran.', 'error');
+    }
+};
+
+// ==========================================
 // TAB 3: PREVIEW & CETAK RAPORT (WALI KELAS/ADMIN)
 // ==========================================
 window.renderPreviewRaport = function() {
@@ -381,6 +473,10 @@ window.renderPreviewRaport = function() {
 };
 
 window.generatePreviewRaport = async function() {
+    const lembaga = window.appState.lembaga[0] || {};
+    // --- GEMBOK MODULAR ---
+    const isPremium = (lembaga.lisensiFitur || []).includes('raport_plus');
+
     const jenis = document.getElementById('prev-jenis').value;
     const bulan = document.getElementById('prev-bulan').value;
     const sVal = document.getElementById('prev-siswa').value;
@@ -407,6 +503,9 @@ window.generatePreviewRaport = async function() {
 
             window.tempDraftRaport = { jenis, semester, idSiswa, namaSiswa, nilaiMapel, rataRata };
 
+            // --- GEMBOK MODULAR: SINKRONISASI KEHADIRAN SISWA OTOMATIS ---
+            const btnSyncAbsen = isPremium ? `<button type="button" onclick="window.tarikAbsensiSiswa('${idSiswa}', '${bulan}')" class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-1 rounded ml-2 font-bold hover:bg-indigo-200 transition shadow-sm"><i class="fa-solid fa-sync mr-1"></i> Auto-Sync Data Kelas</button>` : `<span class="text-[9px] bg-slate-100 text-slate-400 px-2 py-1 rounded ml-2 font-bold cursor-not-allowed border shadow-sm" title="Sinkron Presensi Tersedia di Raport Plus"><i class="fa-solid fa-lock mr-1"></i> Auto-Sync Data Kelas</span>`;
+
             area.innerHTML = `
                 <h3 class="text-xl font-black text-slate-800 text-center uppercase border-b-4 border-indigo-600 pb-4 mb-6">DRAFT RAPORT AKADEMIK UMUM<br><span class="text-sm font-bold text-slate-500">${namaSiswa} | ${semester}</span></h3>
                 <div class="mb-6 overflow-x-auto">
@@ -417,11 +516,14 @@ window.generatePreviewRaport = async function() {
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                        <h4 class="font-black text-sm text-slate-700 mb-3"><i class="fa-solid fa-fingerprint text-indigo-500 mr-1"></i> Kehadiran Bulanan</h4>
+                        <h4 class="font-black text-sm text-slate-700 mb-3 flex items-center justify-between">
+                            <span><i class="fa-solid fa-fingerprint text-indigo-500 mr-1"></i> Kehadiran Bulanan</span>
+                            ${btnSyncAbsen}
+                        </h4>
                         <div class="grid grid-cols-3 gap-3">
-                            <div><label class="text-[10px] font-bold text-slate-500 block">Sakit</label><input type="number" id="draft-sakit" value="0" class="w-full border p-2 rounded text-center font-bold"></div>
-                            <div><label class="text-[10px] font-bold text-slate-500 block">Izin</label><input type="number" id="draft-izin" value="0" class="w-full border p-2 rounded text-center font-bold"></div>
-                            <div><label class="text-[10px] font-bold text-slate-500 block">Alpa</label><input type="number" id="draft-alpa" value="0" class="w-full border p-2 rounded text-center font-bold"></div>
+                            <div><label class="text-[10px] font-bold text-slate-500 block">Sakit</label><input type="number" id="draft-sakit" value="0" class="w-full border p-2 rounded text-center font-bold focus:outline-indigo-500 bg-white"></div>
+                            <div><label class="text-[10px] font-bold text-slate-500 block">Izin</label><input type="number" id="draft-izin" value="0" class="w-full border p-2 rounded text-center font-bold focus:outline-indigo-500 bg-white"></div>
+                            <div><label class="text-[10px] font-bold text-slate-500 block">Alpa</label><input type="number" id="draft-alpa" value="0" class="w-full border p-2 rounded text-center font-bold focus:outline-indigo-500 bg-white"></div>
                         </div>
                     </div>
                     <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -429,7 +531,7 @@ window.generatePreviewRaport = async function() {
                         <textarea id="draft-catatan" rows="3" class="w-full border p-2 rounded text-xs font-medium focus:outline-indigo-500" placeholder="Tulis catatan wali kelas..." required></textarea>
                     </div>
                 </div>
-                <button type="button" onclick="window.simpanFinalRaport()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black px-8 py-4 rounded-xl shadow-lg transition text-lg"><i class="fa-solid fa-box-archive mr-2"></i> Simpan ke Arsip & Cetak PDF</button>
+                <button type="button" onclick="window.simpanFinalRaport()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black px-8 py-4 rounded-xl shadow-lg transition text-lg"><i class="fa-solid fa-box-archive mr-2"></i> Simpan & ${isPremium?'Arsipkan, lalu ':''}Cetak PDF</button>
             `;
         } else {
             const docId = `NT_${idSiswa}_${bulan}`;
@@ -459,7 +561,7 @@ window.generatePreviewRaport = async function() {
                     <h4 class="font-black text-sm text-slate-700 mb-3"><i class="fa-solid fa-comment-dots text-teal-500 mr-1"></i> Catatan Musyrif / Kepala Asrama</h4>
                     <textarea id="draft-catatan" rows="3" class="w-full border p-2 rounded text-xs font-medium focus:outline-teal-500" placeholder="Tulis catatan asrama..." required></textarea>
                 </div>
-                <button type="button" onclick="window.simpanFinalRaport()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black px-8 py-4 rounded-xl shadow-lg transition text-lg"><i class="fa-solid fa-box-archive mr-2"></i> Simpan ke Arsip & Cetak PDF</button>
+                <button type="button" onclick="window.simpanFinalRaport()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black px-8 py-4 rounded-xl shadow-lg transition text-lg"><i class="fa-solid fa-box-archive mr-2"></i> Simpan & ${isPremium?'Arsipkan, lalu ':''}Cetak PDF</button>
             `;
         }
     } catch(e) { area.innerHTML = `<div class="text-center p-10 text-rose-500 font-bold">Terjadi kesalahan sistem.</div>`; }
@@ -482,12 +584,20 @@ window.simpanFinalRaport = async function() {
     }
 
     try {
+        const lembaga = window.appState.lembaga[0] || {};
+        // --- GEMBOK MODULAR ---
+        const isPremium = (lembaga.lisensiFitur || []).includes('raport_plus');
         const docId = `RAPORT_${d.jenis}_${d.idSiswa}_${d.semester.replace(/\s+/g,'')}`;
-        await setDoc(doc(db, "Raport", docId), d);
-        alert("Raport Final Berhasil Diarsipkan!");
+        
+        // JIKA TIDAK DIBELI, DATA TIDAK TERSIMPAN DI ARSIP FIRESTORE
+        if(isPremium) {
+            await setDoc(doc(db, "Raport", docId), d);
+        }
+
+        alert("Berhasil! Sistem akan mulai mencetak file PDF Anda.");
         document.getElementById('preview-result-area').classList.add('hidden');
-        window.cetakRaportPDF(docId, d.jenis);
-    } catch(err) { alert("Gagal menyimpan Arsip: " + err.message); }
+        window.cetakRaportPDF(d, isPremium ? docId : null, d.jenis);
+    } catch(err) { alert("Gagal memproses dokumen: " + err.message); }
 };
 
 // ==========================================
@@ -527,6 +637,7 @@ window.loadArsipRaport = async function() {
             const pj = item.jenis === 'Umum' ? item.waliKelas : item.musyrif;
             const tgl = new Date(item.updatedAt).toLocaleDateString('id-ID', {day:'2-digit',month:'short',year:'numeric'});
 
+            // PENGUBAHAN: Saat cetak ulang, lewatkan seluruh data objek langsung
             html += `
             <tr class="border-b border-slate-100 hover:bg-slate-50 transition">
                 <td class="p-3 font-bold text-slate-500 text-xs">${tgl}</td>
@@ -535,7 +646,7 @@ window.loadArsipRaport = async function() {
                 <td class="p-3 font-black text-slate-800">${item.namaSiswa} <span class="text-[9px] bg-slate-200 text-slate-600 px-1.5 rounded ml-1">Kls ${item.kelas}</span></td>
                 <td class="p-3 text-xs font-bold text-slate-500">${pj}</td>
                 <td class="p-3 text-center">
-                    <button onclick="window.cetakRaportPDF('${d.id}', '${item.jenis}')" class="bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white px-3 py-1.5 rounded-lg transition font-bold text-xs shadow-sm mr-1"><i class="fa-solid fa-print"></i> Cetak Ulang PDF</button>
+                    <button onclick='window.cetakRaportPDF(${JSON.stringify(item).replace(/'/g, "&apos;")}, "${d.id}", "${item.jenis}")' class="bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white px-3 py-1.5 rounded-lg transition font-bold text-xs shadow-sm mr-1"><i class="fa-solid fa-print"></i> Cetak Ulang PDF</button>
                     <button onclick="window.hapusArsipRaport('${d.id}')" class="bg-red-50 hover:bg-red-500 text-red-500 hover:text-white px-2 py-1.5 rounded-lg transition font-bold text-xs shadow-sm"><i class="fa-solid fa-trash"></i></button>
                 </td>
             </tr>`;
@@ -551,21 +662,23 @@ window.hapusArsipRaport = async function(id) {
 };
 
 // ==========================================
-// MESIN CETAK PDF RAPORT
+// MESIN CETAK PDF RAPORT (NATIVE)
 // ==========================================
-window.cetakRaportPDF = async function(idRaport, jenis) {
+window.cetakRaportPDF = async function(dataObj, idRaport, jenis) {
     if (typeof window.showGlobalLoading === "function") window.showGlobalLoading('Menyiapkan Dokumen PDF...');
     
     try {
-        const docRef = doc(db, "Raport", idRaport);
-        const docSnap = await getDoc(docRef);
+        let data = dataObj;
         
-        if (!docSnap.exists()) {
-            if (typeof window.hideGlobalLoading === "function") window.hideGlobalLoading();
-            return alert("Dokumen Raport tidak ditemukan di database!");
+        // Opsi fallback jika data tidak ter-pass sempurna dari memori
+        if (!data || Object.keys(data).length === 0) {
+            if (!idRaport) throw new Error("Data raport hilang dari memori (Mode Standar)");
+            const docRef = doc(db, "Raport", idRaport);
+            const docSnap = await getDoc(docRef);
+            if (!docSnap.exists()) throw new Error("Dokumen Raport tidak ditemukan di database!");
+            data = docSnap.data();
         }
 
-        const data = docSnap.data();
         const lembaga = window.appState.lembaga[0] || {};
         const logoUrl = lembaga.logo || '';
         
@@ -626,9 +739,9 @@ window.cetakRaportPDF = async function(idRaport, jenis) {
                     <div style="flex:1;">
                         <h4 style="margin:0 0 5px 0; font-size:14px; font-weight:bold; border-bottom:2px solid #cbd5e1; padding-bottom:5px;">Kehadiran</h4>
                         <table style="width:100%; border-collapse:collapse; font-size:13px; border:1px solid #cbd5e1;">
-                            <tr><td style="padding:6px 10px; border-bottom:1px solid #e2e8f0;">Sakit</td><td style="padding:6px 10px; border-bottom:1px solid #e2e8f0; text-align:center;">${data.kehadiran.sakit} Hari</td></tr>
-                            <tr><td style="padding:6px 10px; border-bottom:1px solid #e2e8f0;">Izin</td><td style="padding:6px 10px; border-bottom:1px solid #e2e8f0; text-align:center;">${data.kehadiran.izin} Hari</td></tr>
-                            <tr><td style="padding:6px 10px;">Tanpa Keterangan</td><td style="padding:6px 10px; text-align:center;">${data.kehadiran.alpa} Hari</td></tr>
+                            <tr><td style="padding:6px 10px; border-bottom:1px solid #e2e8f0;">Sakit</td><td style="padding:6px 10px; border-bottom:1px solid #e2e8f0; text-align:center;">${data.kehadiran?.sakit||0} Hari</td></tr>
+                            <tr><td style="padding:6px 10px; border-bottom:1px solid #e2e8f0;">Izin</td><td style="padding:6px 10px; border-bottom:1px solid #e2e8f0; text-align:center;">${data.kehadiran?.izin||0} Hari</td></tr>
+                            <tr><td style="padding:6px 10px;">Tanpa Keterangan</td><td style="padding:6px 10px; text-align:center;">${data.kehadiran?.alpa||0} Hari</td></tr>
                         </table>
                     </div>
                     <div style="flex:2;">
@@ -691,7 +804,7 @@ window.cetakRaportPDF = async function(idRaport, jenis) {
                 <tr>
                     <td style="width:33%; padding-bottom:80px;">Mengetahui,<br>Orang Tua / Wali</td>
                     <td style="width:33%; padding-bottom:80px;"></td>
-                    <td style="width:33%; padding-bottom:80px;">Diberikan di: Tangerang<br>Tanggal: ${new Date().toLocaleDateString('id-ID', {day:'numeric',month:'long',year:'numeric'})}<br><br>${jenis === 'Umum' ? 'Wali Kelas' : 'Musyrif / Pembina'}</td>
+                    <td style="width:33%; padding-bottom:80px;">Diberikan di: Kantor Yayasan<br>Tanggal: ${new Date().toLocaleDateString('id-ID', {day:'numeric',month:'long',year:'numeric'})}<br><br>${jenis === 'Umum' ? 'Wali Kelas' : 'Musyrif / Pembina'}</td>
                 </tr>
                 <tr>
                     <td style="font-weight:bold;">( ......................................... )</td>
