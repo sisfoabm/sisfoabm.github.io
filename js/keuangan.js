@@ -70,14 +70,17 @@ export async function renderHalamanKeuangan(container) {
 }
 
 function renderKeuanganTabs(container) {
+    // --- CEK LISENSI MODULAR ---
+    const hasKeuanganPlus = window.cekLisensi('keuangan_plus');
+
     let tabsHTML = '';
     if (window.isPegawaiBiasa) {
         tabsHTML = `<button class="px-8 py-4 rounded-t-2xl font-black text-lg bg-indigo-600 text-white shadow-[0_-5px_15px_rgba(79,70,229,0.3)] border-b-4 border-indigo-600 translate-y-[4px]"><i class="fa-solid fa-file-invoice-dollar mr-3"></i> Slip Gaji Saya</button>`;
     } else {
         tabsHTML = `
             <button onclick="window.switchKeuanganTab('dasbor')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentKeuanganTab === 'dasbor' ? 'bg-indigo-600 text-white shadow-[0_-5px_15px_rgba(79,70,229,0.3)] border-b-4 border-indigo-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-chart-pie mr-2"></i> Dasbor</button>
-            <button onclick="window.switchKeuanganTab('spp')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentKeuanganTab === 'spp' ? 'bg-orange-500 text-white shadow-[0_-5px_15px_rgba(249,115,22,0.3)] border-b-4 border-orange-500 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-hand-holding-dollar mr-2"></i> Pembayaran SPP</button>
-            <button onclick="window.switchKeuanganTab('beasiswa')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentKeuanganTab === 'beasiswa' ? 'bg-purple-600 text-white shadow-[0_-5px_15px_rgba(147,51,234,0.3)] border-b-4 border-purple-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-user-graduate mr-2"></i> Beasiswa</button>
+            <button onclick="window.switchKeuanganTab('spp')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentKeuanganTab === 'spp' ? 'bg-orange-500 text-white shadow-[0_-5px_15px_rgba(249,115,22,0.3)] border-b-4 border-orange-500 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-hand-holding-dollar mr-2"></i> Pembayaran SPP ${!hasKeuanganPlus ? '<i class="fa-solid fa-lock text-amber-500 ml-2 text-xs" title="Tersegel Premium"></i>' : ''}</button>
+            <button onclick="window.switchKeuanganTab('beasiswa')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentKeuanganTab === 'beasiswa' ? 'bg-purple-600 text-white shadow-[0_-5px_15px_rgba(147,51,234,0.3)] border-b-4 border-purple-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-user-graduate mr-2"></i> Beasiswa ${!hasKeuanganPlus ? '<i class="fa-solid fa-lock text-amber-500 ml-2 text-xs" title="Tersegel Premium"></i>' : ''}</button>
             <button onclick="window.switchKeuanganTab('slip')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentKeuanganTab === 'slip' ? 'bg-indigo-600 text-white shadow-[0_-5px_15px_rgba(79,70,229,0.3)] border-b-4 border-indigo-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-print mr-2"></i> Slip Gaji</button>
             <button onclick="window.switchKeuanganTab('skema')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentKeuanganTab === 'skema' ? 'bg-indigo-600 text-white shadow-[0_-5px_15px_rgba(79,70,229,0.3)] border-b-4 border-indigo-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-money-check-dollar mr-2"></i> Skema Gaji</button>
             <button onclick="window.switchKeuanganTab('kas')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentKeuanganTab === 'kas' ? 'bg-emerald-600 text-white shadow-[0_-5px_15px_rgba(16,185,129,0.3)] border-b-4 border-emerald-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-book-journal-whills mr-2"></i> Kas Lembaga</button>
@@ -91,8 +94,14 @@ function renderKeuanganTabs(container) {
     `;
 
     if (window.currentKeuanganTab === 'dasbor') window.renderTabDasbor();
-    else if (window.currentKeuanganTab === 'spp') window.renderTabSPP();
-    else if (window.currentKeuanganTab === 'beasiswa') window.renderTabBeasiswa();
+    else if (window.currentKeuanganTab === 'spp') {
+        if (!hasKeuanganPlus) document.getElementById('keuangan-content-area').innerHTML = window.renderLockedPremiumHTML('Pembayaran SPP Terpadu');
+        else window.renderTabSPP();
+    }
+    else if (window.currentKeuanganTab === 'beasiswa') {
+        if (!hasKeuanganPlus) document.getElementById('keuangan-content-area').innerHTML = window.renderLockedPremiumHTML('Manajemen Beasiswa & Potongan');
+        else window.renderTabBeasiswa();
+    }
     else if (window.currentKeuanganTab === 'slip' || window.currentKeuanganTab === 'my_slip') renderTabSlip();
     else if (window.currentKeuanganTab === 'skema') window.renderTabSkema();
     else if (window.currentKeuanganTab === 'kas') renderTabKas();
@@ -932,8 +941,8 @@ window.kalkulasiGajiBulk = async function() {
                     pokok = count * skema.nominal; ketP = `${count}x Hadir`;
                 } else if (skema.metode === 'Per JP') {
                     let jp = absJab.reduce((sum, a) => {
-                        if(!a.jamTxt || a.jamTxt==='-') return sum+1; const p=a.jamTxt.replace('Jam ','').split('-');
-                        return sum + (p.length===2 ? Number(p[1])-Number(p[0])+1 : 1);
+                        if(!a.jamTxt || a.jamTxt==='-') return sum+1; const pj=a.jamTxt.replace('Jam ','').split('-');
+                        return sum + (pj.length===2 ? Number(pj[1])-Number(pj[0])+1 : 1);
                     }, 0);
                     pokok = jp * skema.nominal; ketP = `${jp} JP`;
                 }
@@ -955,6 +964,15 @@ window.kalkulasiGajiBulk = async function() {
 
                 ringkasanInfo.push(`<span class="font-bold text-slate-700">${jab.namaJabatan}</span> <span class="text-[10px] bg-slate-100 px-1 rounded border">Pkk: Rp ${window.fRp(pokok)} | Tnj: Rp ${window.fRp(tPenTotal)} | PotLain: Rp ${window.fRp((telatMins * skema.potTelat) + tPotTotal)}</span>`);
             });
+
+            // --- INJEKSI FITUR HONOR RAPAT ---
+            const rapatHadir = absensiRaw.filter(a => a.idGuru === p.id && a.tipe === 'Rapat' && Number(a.honorRapat || 0) > 0);
+            if (rapatHadir.length > 0) {
+                let totalHonorRapat = rapatHadir.reduce((sum, r) => sum + Number(r.honorRapat), 0);
+                penAuto.push({ nama: `Honor Rapat (${rapatHadir.length}x Hadir)`, nom: totalHonorRapat });
+                ringkasanInfo.push(`<span class="font-bold text-purple-700">Honor Rapat</span> <span class="text-[10px] bg-purple-50 text-purple-600 px-1 rounded border border-purple-200">Rp ${window.fRp(totalHonorRapat)}</span>`);
+            }
+            // ---------------------------------
 
             window.rawGajiSistem[p.id] = { penAuto, potAuto, nama: p.nama, bln: bln, jabatans: p.detailJabatan };
             
@@ -1258,6 +1276,10 @@ export async function renderTabKas() {
     window.appState = window.appState || {};
     if (!window.kasCheckedIds) window.kasCheckedIds = new Set();
     
+    const lembaga = window.appState.lembaga[0] || {};
+    // --- GEMBOK MODULAR ---
+    const isPremium = (lembaga.lisensiFitur || []).includes('keuangan_plus');
+
     const area = document.getElementById('keuangan-content-area');
     if(!area) return;
     
@@ -1278,6 +1300,10 @@ export async function renderTabKas() {
     const grandMasuk = allKas.filter(k => k.jenis === 'Pemasukan').reduce((s, k) => s + Number(k.nominal), 0);
     const grandKeluar = allKas.filter(k => k.jenis === 'Pengeluaran').reduce((s, k) => s + Number(k.nominal), 0);
     const grandSaldo = grandMasuk - grandKeluar;
+
+    let bulkBtn = isPremium 
+        ? `<button onclick="window.bukaModalKas('bulk')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-black text-sm shadow-md transition"><i class="fa-solid fa-list-ol mr-1"></i> Bulk</button>`
+        : `<button class="bg-slate-200 text-slate-400 px-4 py-2.5 rounded-xl font-black text-sm shadow-sm cursor-not-allowed" title="Input Bulk Tersedia di Keuangan Terpadu"><i class="fa-solid fa-lock mr-1"></i> Bulk</button>`;
 
     area.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -1305,7 +1331,7 @@ export async function renderTabKas() {
                 <div class="flex flex-wrap gap-2 items-center ml-auto">
                     <button onclick="window.bukaModalKategoriKas()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2.5 rounded-xl font-bold text-sm transition"><i class="fa-solid fa-tags mr-1"></i> Master Kategori</button>
                     <button onclick="window.bukaModalKas('single')" class="bg-white hover:bg-indigo-50 text-indigo-600 border-2 border-indigo-200 hover:border-indigo-600 px-4 py-2.5 rounded-xl font-black text-sm transition"><i class="fa-solid fa-plus mr-1"></i> Single</button>
-                    <button onclick="window.bukaModalKas('bulk')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-black text-sm shadow-md transition"><i class="fa-solid fa-list-ol mr-1"></i> Bulk</button>
+                    ${bulkBtn}
                     <div class="h-6 w-px bg-slate-300 mx-1 hidden sm:block"></div>
                     <label class="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl font-black text-sm shadow-md transition cursor-pointer flex items-center mb-0"><i class="fa-solid fa-upload mr-1"></i> Impor CSV <input type="file" accept=".csv" onchange="window.imporKasCSV(event)" class="hidden"></label>
                     <button onclick="window.eksporKasCSV()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-xl font-black text-sm shadow-md transition"><i class="fa-solid fa-download mr-1"></i> Ekspor CSV</button>
