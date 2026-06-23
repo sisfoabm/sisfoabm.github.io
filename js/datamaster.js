@@ -61,12 +61,21 @@ window.toggleDisiplinFields = function() {
     if(val === 'Super Ketat') fgps.classList.remove('hidden');
 };
 
+
 export function renderHalamanLembaga(container) {
+    if(typeof window.tampilkanPopupTrial === 'function') window.tampilkanPopupTrial();
+    
     const profil = window.appState.lembaga[0] || {}; 
+    const currentUser = window.currentUser || {};
+    const isSuperAdmin = currentUser.hakAkses === 'Super Admin';
+    const lisensiFitur = profil.lisensiFitur || [];
+    const hasPresensiPlus = window.cekLisensi('presensi_plus');
     
     container.innerHTML = `
-        <div class="bg-white p-6 rounded-xl shadow mb-6 border-t-4 border-primary">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 border-b pb-2 gap-4">
+        <div class="bg-white p-6 rounded-xl shadow mb-6 border-t-4 border-primary relative overflow-hidden">
+            <div class="absolute top-0 right-0 bg-blue-100 text-blue-700 px-4 py-1 rounded-bl-xl text-[10px] font-black"><i class="fa-solid fa-puzzle-piece mr-1"></i> ${lisensiFitur.length} MODUL EKSTRA AKTIF</div>
+            
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 border-b pb-2 gap-4 mt-2">
                 <h2 class="text-xl font-bold">Konfigurasi Sistem Utama Lembaga</h2>
                 <div class="flex gap-2">
                     <button type="button" onclick="window.eksporDataCSV('lembaga', 'Data_Lembaga')" class="bg-blue-50 text-blue-600 border border-blue-200 px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition shadow-sm flex items-center"><i class="fa-solid fa-download mr-2"></i> Ekspor CSV</button>
@@ -189,7 +198,9 @@ export function renderHalamanLembaga(container) {
                         <input type="text" id="lem-tahfidz-istirahat" placeholder="Cth: 10:00-10:15, 12:00-12:30" class="border p-2 rounded w-full">
                     </div>
                     
-                    <div class="col-span-1 md:col-span-2 border p-4 rounded bg-orange-50 border-orange-200">
+                    <div class="col-span-1 md:col-span-2 border p-4 rounded bg-orange-50 border-orange-200 relative">
+                        ${!hasPresensiPlus ? `<div class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center rounded"><span class="bg-amber-100 text-amber-700 px-4 py-2 rounded-lg font-black border border-amber-300 shadow-sm"><i class="fa-solid fa-lock mr-2"></i> Mode Disiplin Super Ketat (GPS) hanya tersedia di Lisensi Presensi Pro.</span></div>` : ''}
+                        
                         <label class="text-sm font-bold text-slate-700 block mb-2">Sistem Kedisiplinan Presensi Pegawai</label>
                         <select id="lem-disiplin" onchange="window.toggleDisiplinFields()" class="border p-2 rounded w-full focus:outline-primary mb-3 font-semibold text-orange-700" required>
                             <option value="">-- Pilih Tingkat Kedisiplinan --</option>
@@ -245,7 +256,6 @@ export function renderHalamanLembaga(container) {
                     <button type="submit" id="btn-simpan-lem" class="bg-primary hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-bold transition shadow-lg w-full md:w-auto"><i class="fa-solid fa-save mr-2"></i> Simpan Konfigurasi Lembaga</button>
                     ${profil.id ? `
                     <button type="button" onclick="window.bukaModalWewenang()" class="bg-indigo-500 hover:bg-indigo-600 text-white px-8 py-3 rounded-lg font-bold transition shadow-lg w-full md:w-auto"><i class="fa-solid fa-user-shield mr-2"></i> Atur Wewenang</button>
-                    
                     ` : ''}
                 </div>
             </form>
@@ -314,7 +324,14 @@ export function renderHalamanLembaga(container) {
             document.getElementById('lem-umum-frek').value = profil.umumFrek || ''; document.getElementById('lem-umum-waktuist').value = profil.umumWaktu || ''; 
             document.getElementById('lem-tahfidz-jp').value = profil.tahfidzJp || ''; document.getElementById('lem-tahfidz-masuk').value = profil.tahfidzMasuk || ''; 
             document.getElementById('lem-tahfidz-frek').value = profil.tahfidzFrek || ''; document.getElementById('lem-tahfidz-waktuist').value = profil.tahfidzWaktu || ''; 
-            document.getElementById('lem-disiplin').value = profil.kedisiplinan || '';
+            
+            // JIKA TIDAK PUNYA LISENSI PRESENSI PLUS, PAKSA TURUNKAN DISIPLIN KE SEMI KETAT JIKA SEBELUMNYA SUPER KETAT
+            if (!hasPresensiPlus && profil.kedisiplinan === 'Super Ketat') {
+                document.getElementById('lem-disiplin').value = 'Semi Ketat';
+            } else {
+                document.getElementById('lem-disiplin').value = profil.kedisiplinan || '';
+            }
+
             document.getElementById('lem-tema').value = profil.temaWebsite || 'tema-1';
             document.getElementById('lem-mapel').value = profil.daftarMapel || '';
             document.getElementById('lem-umum-pulang').value = profil.umumPulang || '';
@@ -323,14 +340,12 @@ export function renderHalamanLembaga(container) {
             document.getElementById('lem-umum-istirahat').value = profil.umumIstirahat || '';
             document.getElementById('lem-tahfidz-istirahat').value = profil.tahfidzIstirahat || '';
 
-            // Isi form dinamis presensi
             document.getElementById('lem-toleransi-telat').value = profil.toleransiTelat || '';
             document.getElementById('lem-jam-masuk-kerja').value = profil.jamMasukKerja || '';
             document.getElementById('lem-jam-pulang-kerja').value = profil.jamPulangKerja || '';
             document.getElementById('lem-gps-kantor').value = profil.gpsKantor || '';
             document.getElementById('lem-radius-gps').value = profil.radiusGps || '';
             
-            // Panggil trigger untuk membuka tutup form dinamis
             window.toggleDisiplinFields();
         }, 50);
     }
@@ -1579,15 +1594,83 @@ window.prosesArsipkanData = async function() {
     } catch(e) { alert("Gagal membersihkan database."); }
 };
 
+// ================= RE-RENDER TABEL HISTORI SAJA (FILTER) =================
+window.filterTabelHistori = function() {
+    const tglMulai = document.getElementById('filter-hist-start').value;
+    const tglSampai = document.getElementById('filter-hist-end').value;
+    const bodyTabel = document.getElementById('tbody-histori');
+    
+    if(!tglMulai || !tglSampai) return alert("Pilih tanggal rentang awal dan akhir!");
+
+    let filtered = window.rawHistoriSaya.filter(h => h.tanggal >= tglMulai && h.tanggal <= tglSampai);
+    filtered.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+    let displayRows = [];
+    let processedCICO = new Set();
+
+    filtered.forEach(h => {
+        if (h.tipe === 'CICO') {
+            const key = `${h.tanggal}_${h.jabatan}`;
+            if (processedCICO.has(key)) return;
+            processedCICO.add(key);
+            
+            const cicos = filtered.filter(x => x.tipe === 'CICO' && x.tanggal === h.tanggal && x.jabatan === h.jabatan);
+            const cin = cicos.find(x => x.status === 'Cek In');
+            const cout = cicos.find(x => x.status === 'Cek Out');
+            
+            displayRows.push({
+                tanggal: h.tanggal, jabatan: h.jabatan || 'Pegawai',
+                waktu: `<span class="text-emerald-600 font-bold block mb-1">IN: <span class="text-slate-700">${cin ? cin.waktu : '-'}</span></span> <span class="text-rose-600 font-bold block">OUT: <span class="text-slate-700">${cout ? cout.waktu : '-'}</span></span>`,
+                keterangan: `<span class="italic text-slate-400">${cin?.keterangan || 'Tidak ada catatan'}</span>`
+            });
+        } else if (h.tipe === '1x' || h.tipe === 'Rapat') {
+            let badgeTipe = h.tipe === 'Rapat' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700';
+            displayRows.push({
+                tanggal: h.tanggal, jabatan: h.jabatan || 'Pegawai',
+                waktu: `<span class="${badgeTipe} px-2 py-1 rounded font-black whitespace-nowrap">Pkl ${h.waktu}</span>`,
+                keterangan: `<span class="italic text-slate-400">${h.keterangan || 'Hadir'}</span> <span class="text-[9px] bg-slate-200 text-slate-600 px-1.5 rounded ml-1 font-bold">${h.tipe}</span>`
+            });
+        } else if (h.tipe === 'Kelas' || h.tipe === 'Inval') {
+            const as = window.rawHistoriSiswa.find(s => s.tanggal === h.tanggal && s.kelas === h.kelas && s.jamTxt === h.jamTxt);
+            let jmlHadirText = `<button type="button" onclick="window.bukaModalAbsenSiswa('${h.kelas}', '${h.mapel}', '${h.jamTxt}', '${h.tanggal}')" class="mt-1 text-white font-bold bg-rose-500 hover:bg-rose-600 px-2 py-1 rounded shadow-sm transition text-[10px] cursor-pointer"><i class="fa-solid fa-hand-pointer mr-1"></i> Klik Absen Siswa</button>`;
+            if (as && as.detailSiswa) {
+                const jmlHadir = as.detailSiswa.filter(ds => ds.status === 'Hadir').length;
+                jmlHadirText = `<button type="button" onclick="window.bukaModalAbsenSiswa('${h.kelas}', '${h.mapel}', '${h.jamTxt}', '${h.tanggal}')" class="mt-1 text-emerald-700 font-black bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 px-2 py-0.5 rounded shadow-sm transition cursor-pointer" title="Klik untuk edit"><i class="fa-solid fa-pen-to-square mr-1"></i> ${jmlHadir} Anak Hadir</button>`;
+            }
+            
+            displayRows.push({
+                tanggal: h.tanggal,
+                jabatan: `<span class="font-bold text-slate-800">Guru (${h.kelas})</span> ${h.status==='Inval'?'<span class="text-[9px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded ml-1 uppercase font-black">INVAL</span>':''}`,
+                waktu: `<span class="font-bold text-slate-700 whitespace-nowrap">Pkl ${h.waktu}</span> <br> <span class="text-[10px] text-indigo-500 font-bold bg-indigo-50 px-1 rounded mt-1 inline-block">${h.jamTxt}</span>`,
+                keterangan: `<span class="font-black text-slate-700 block mb-0.5">${h.mapel}</span> <span class="text-xs text-slate-500 italic block mb-1">${h.keterangan || '-'}</span> ${jmlHadirText}`
+            });
+        }
+    });
+
+    bodyTabel.innerHTML = displayRows.map((r, idx) => `
+        <tr class="border-b hover:bg-slate-50 text-sm transition">
+            <td class="p-3 text-center font-medium">${idx + 1}</td>
+            <td class="p-3 font-bold text-slate-700 whitespace-nowrap">${r.tanggal}</td>
+            <td class="p-3 leading-tight">${r.jabatan}</td>
+            <td class="p-3 leading-tight">${r.waktu}</td>
+            <td class="p-3 leading-tight">${r.keterangan}</td>
+        </tr>
+    `).join('') || '<tr><td colspan="5" class="p-6 text-center text-slate-400 font-medium">Tidak ada histori di rentang tanggal tersebut.</td></tr>';
+};
+
 // ================= RENDER UTAMA ABSENSI =================
 export async function renderHalamanAbsensi(container) {
+    if(typeof window.tampilkanPopupTrial === 'function') window.tampilkanPopupTrial();
+
     container.innerHTML = `<div class="text-center p-20"><i class="fa-solid fa-circle-notch fa-spin text-5xl text-indigo-500 mb-4"></i><p class="font-bold text-slate-500 text-lg">Mensinkronisasi Sistem Presensi Real-Time...</p></div>`;
 
     const lembaga = window.appState.lembaga[0] || {};
     const sessionUser = window.currentUser || {};
     const detailJabs = (window.appState.pegawai.find(p => p.id === sessionUser.id) || sessionUser).detailJabatan || [];
     
-    // Logika Penggabungan Jabatan 1x
+    // --- CEK LISENSI MODULAR ---
+    const hasPresensiPlus = window.cekLisensi('presensi_plus');
+    
     const jabatan1x = detailJabs.filter(d => d.tipePresensi === '1x');
     const jabatanLain = detailJabs.filter(d => d.tipePresensi !== '1x');
     let opsiJabatanArray = [];
@@ -1606,7 +1689,6 @@ export async function renderHalamanAbsensi(container) {
     const hariIniStr = hariKerja[now.getDay()];
     const todayISO = window.getLocalISOString();
 
-    // CEK HARI LIBUR
     const liburConfig = lembaga.libur || 'Hanya Ahad';
     let liburIndices = [];
     if(liburConfig.toLowerCase().includes('ahad')) liburIndices.push(0);
@@ -1618,21 +1700,28 @@ export async function renderHalamanAbsensi(container) {
     let isTanggalMerah = false;
     let namaLibur = '';
     
-    (window.appState.kalender || []).forEach(agenda => {
-        if(agenda.tipeAgenda === 'Libur') {
-            const start = new Date(agenda.tanggalMulai); start.setHours(0,0,0,0);
-            const end = agenda.tanggalSelesai ? new Date(agenda.tanggalSelesai) : new Date(start); end.setHours(23,59,59,999);
-            if(now >= start && now <= end) { isTanggalMerah = true; namaLibur = agenda.judulAgenda; }
-        }
-    });
+    // --- GEMBOK MODULAR: HANYA PLUS YANG DETEKSI TANGGAL MERAH KALENDER ---
+    if (hasPresensiPlus) {
+        (window.appState.kalender || []).forEach(agenda => {
+            if(agenda.tipeAgenda === 'Libur') {
+                const start = new Date(agenda.tanggalMulai); start.setHours(0,0,0,0);
+                const end = agenda.tanggalSelesai ? new Date(agenda.tanggalSelesai) : new Date(start); end.setHours(23,59,59,999);
+                if(now >= start && now <= end) { isTanggalMerah = true; namaLibur = agenda.judulAgenda; }
+            }
+        });
+    }
 
     let liburMessage = '';
     if(isTanggalMerah) liburMessage = `Sistem presensi ditutup karena bertepatan dengan tanggal merah: ${namaLibur}`;
     else if(isLiburPekanan) liburMessage = `Sistem presensi ditutup karena bertepatan dengan hari libur pekanan lembaga.`;
 
     let todayAbsensi = []; window.rawHistoriSaya = []; window.rawHistoriSiswa = [];
+    let activeRapatList = []; 
 
     try {
+        const { db } = await import('./firebase-init.js');
+        const { collection, getDocs, query, where } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
+        
         const snapToday = await getDocs(query(collection(db, "Absensi"), where("tanggal", "==", todayISO)));
         snapToday.forEach(doc => { const d = doc.data(); todayAbsensi.push({id: doc.id, ...d}); if(d.idGuru === sessionUser.id) window.rawHistoriSaya.push({id: doc.id, ...d}); });
 
@@ -1641,6 +1730,12 @@ export async function renderHalamanAbsensi(container) {
 
         const snapSiswa = await getDocs(query(collection(db, "AbsensiSiswa"), where("idGuru", "==", sessionUser.id)));
         snapSiswa.forEach(doc => window.rawHistoriSiswa.push(doc.data()));
+
+        // --- GEMBOK MODULAR: TARIK DATA RAPAT JIKA PRESENSI PLUS ---
+        if (hasPresensiPlus) {
+            const snapRapat = await getDocs(query(collection(db, "Rapat"), where("status", "==", "Aktif")));
+            snapRapat.forEach(doc => activeRapatList.push({ id: doc.id, ...doc.data() }));
+        }
     } catch(e) { console.error("Gagal sinkron absen", e); }
 
     const isKelasTerisi = (kelas, mapel, jamTxt) => todayAbsensi.some(a => (a.tipe === "Kelas" || a.tipe === "Inval") && a.kelas === kelas && a.jamTxt === jamTxt);
@@ -1669,6 +1764,78 @@ export async function renderHalamanAbsensi(container) {
     }).join('');
     if(!dropdownInvalHTML) dropdownInvalHTML = '<option value="">(Tidak ada kelas kosong di jam ini)</option>';
 
+    let rapatHTML = '';
+    let btnBukaRapat = '';
+
+    // --- GEMBOK MODULAR: TAMPILKAN UI RAPAT HANYA JIKA PRESENSI PLUS ---
+    if (hasPresensiPlus) {
+        if (activeRapatList.length > 0) {
+            rapatHTML = activeRapatList.map(r => {
+                const formatterRp = new Intl.NumberFormat('id-ID');
+                const isAdminAtauKepala = ['Super Admin', 'Administrator', 'Operator/TU'].includes(sessionUser.hakAkses) || (sessionUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('kepala'));
+
+                let isMulai = true; let jadwalText = '';
+                if (r.tanggalMulai && r.waktuMulai) {
+                    const jadwalDate = new Date(`${r.tanggalMulai}T${r.waktuMulai}:00`);
+                    isMulai = now >= jadwalDate;
+                    jadwalText = `${r.tanggalMulai.split('-').reverse().join('/')} pkl ${r.waktuMulai}`;
+                } else { jadwalText = `Dibuka spontan: ${r.waktuBuka}`; }
+
+                let btnEdit = isAdminAtauKepala ? `<button onclick="window.editModalRapat('${r.id}')" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-3.5 rounded-xl font-bold shadow-lg transition flex items-center justify-center md:mr-2 w-full md:w-auto mt-2 md:mt-0" title="Revisi Jadwal"><i class="fa-solid fa-pen-to-square"></i></button>` : '';
+                let btnTutup = isAdminAtauKepala ? `<button onclick="window.tutupRapat('${r.id}')" class="bg-red-500 hover:bg-red-600 text-white px-4 py-3.5 rounded-xl font-bold shadow-lg transition flex items-center justify-center w-full md:w-auto mt-2 md:mt-0" title="Tutup Sesi Rapat"><i class="fa-solid fa-power-off"></i></button>` : '';
+
+                if (r.peserta && Array.isArray(r.peserta) && !r.peserta.includes(sessionUser.id)) {
+                    if (isAdminAtauKepala) {
+                        return `
+                        <div class="bg-gradient-to-r from-slate-600 to-slate-700 rounded-2xl p-6 shadow-xl mb-6 text-white flex flex-col md:flex-row justify-between items-center border border-slate-500 relative overflow-hidden">
+                            <div class="relative z-10 w-full md:w-auto text-center md:text-left mb-4 md:mb-0">
+                                <span class="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-3 inline-block shadow-sm"><i class="fa-solid fa-eye mr-1"></i> Mode Pemantauan (Bukan Peserta)</span>
+                                <h3 class="text-2xl font-black tracking-tight mb-1">${r.judul}</h3>
+                                <p class="text-slate-300 text-xs font-medium mb-1">${r.deskripsi || 'Tidak ada deskripsi'}</p>
+                                <p class="text-slate-300 text-xs font-medium">Peserta: ${r.peserta.length} Org | Honor: Rp ${formatterRp.format(r.nominalHonor || 0)} | <i class="fa-regular fa-clock"></i> Jadwal: ${jadwalText}</p>
+                            </div>
+                            <div class="relative z-10 flex flex-col md:flex-row gap-0 md:gap-2 w-full md:w-auto">
+                                ${btnEdit}${btnTutup}
+                            </div>
+                        </div>`;
+                    }
+                    return ''; 
+                }
+
+                const sudahHadir = todayAbsensi.some(a => a.tipe === 'Rapat' && a.idRapat === r.id && a.idGuru === sessionUser.id);
+                let actionBtn = '';
+                
+                if (!isMulai) {
+                    actionBtn = `<button disabled class="flex-1 md:flex-none bg-slate-200 text-slate-400 font-black px-8 py-3.5 rounded-xl shadow cursor-not-allowed flex items-center justify-center"><i class="fa-solid fa-clock mr-2"></i> Belum Mulai</button>`;
+                } else if (sudahHadir) {
+                    actionBtn = `<div class="bg-emerald-500/20 border border-emerald-400 text-emerald-100 font-black px-6 py-3.5 rounded-xl shadow-inner w-full md:w-auto text-center flex items-center justify-center"><i class="fa-solid fa-check-double mr-2"></i> Anda Sudah Hadir</div>`;
+                } else {
+                    actionBtn = `<button onclick="window.hadirRapat('${r.id}', '${r.judul}')" class="flex-1 md:flex-none bg-white text-indigo-700 hover:bg-indigo-50 font-black px-8 py-3.5 rounded-xl shadow-lg transition transform hover:-translate-y-1 flex items-center justify-center"><i class="fa-solid fa-hand-sparkles mr-2"></i> Klik Hadir Rapat</button>`;
+                }
+
+                return `
+                <div class="bg-gradient-to-r from-purple-600 to-indigo-700 rounded-2xl p-6 shadow-xl mb-6 text-white flex flex-col md:flex-row justify-between items-center border border-purple-400/30 relative overflow-hidden">
+                    <div class="absolute -right-10 -top-10 opacity-10 pointer-events-none"><i class="fa-solid fa-users-viewfinder text-9xl"></i></div>
+                    <div class="relative z-10 w-full md:w-auto text-center md:text-left mb-4 md:mb-0">
+                        <span class="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-3 inline-block shadow-sm"><i class="fa-solid fa-circle ${isMulai?'text-red-400 animate-pulse':'text-yellow-400'} mr-1"></i> ${isMulai?'Rapat Sedang Berlangsung':'Rapat Terjadwal'}</span>
+                        <h3 class="text-2xl font-black tracking-tight mb-1">${r.judul}</h3>
+                        <p class="text-indigo-100 text-xs font-medium mb-1">${r.deskripsi || ''}</p>
+                        <p class="text-indigo-200 text-[10px] font-bold mt-2"><i class="fa-regular fa-clock mr-1"></i> Jadwal: ${jadwalText}</p>
+                    </div>
+                    <div class="relative z-10 flex flex-col md:flex-row gap-0 md:gap-2 w-full md:w-auto">
+                        ${actionBtn}
+                        ${btnEdit}
+                        ${btnTutup}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        if (['Super Admin', 'Administrator', 'Operator/TU'].includes(sessionUser.hakAkses) || (sessionUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('kepala'))) {
+            btnBukaRapat = `<button onclick="window.bukaModalRapat()" class="bg-purple-100 hover:bg-purple-600 text-purple-700 hover:text-white font-bold px-4 py-2 rounded-xl text-sm shadow-sm transition ml-2 flex items-center"><i class="fa-solid fa-users-viewfinder md:mr-2"></i> <span class="hidden md:inline">Buat Rapat</span></button>`;
+        }
+    }
+
     container.innerHTML = `
         <div class="bg-gradient-to-r from-slate-800 to-slate-900 p-8 rounded-2xl shadow-xl mb-8 text-center border-b-4 border-indigo-500 relative overflow-hidden">
             <div class="absolute top-0 right-0 opacity-10"><i class="fa-solid fa-clock text-9xl -mt-4 -mr-4"></i></div>
@@ -1676,6 +1843,8 @@ export async function renderHalamanAbsensi(container) {
             <p id="jam-realtime" class="text-5xl md:text-6xl font-black text-white tracking-widest drop-shadow-lg mb-2">00:00:00</p>
             <p id="tgl-realtime" class="text-lg md:text-xl font-medium text-slate-300">Memuat Tanggal...</p>
         </div>
+
+        ${rapatHTML}
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="lg:col-span-2">
@@ -1685,7 +1854,10 @@ export async function renderHalamanAbsensi(container) {
                             <div class="bg-blue-100 text-blue-600 p-3 rounded-xl mr-4"><i class="fa-solid fa-clipboard-user text-2xl"></i></div>
                             <h3 class="font-black text-2xl text-slate-800">Panel Presensi Anda</h3>
                         </div>
-    ${['Operator/TU', 'Administrator', 'Super Admin'].includes(sessionUser.hakAkses) ? `<button onclick="window.bukaModalArsip()" id="btn-buka-arsip" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-sm shadow-sm transition"><i class="fa-solid fa-box-archive mr-2"></i> Buka Arsip Presensi</button>` : ''}
+                        <div class="flex items-center">
+                            ${['Operator/TU', 'Administrator', 'Super Admin'].includes(sessionUser.hakAkses) ? `<button onclick="window.bukaModalArsip()" id="btn-buka-arsip" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-sm shadow-sm transition flex items-center"><i class="fa-solid fa-box-archive md:mr-2"></i> <span class="hidden md:inline">Arsip</span></button>` : ''}
+                            ${btnBukaRapat}
+                        </div>
                     </div>
                     
                     ${(isLiburPekanan || isTanggalMerah) ? `
@@ -1755,10 +1927,10 @@ export async function renderHalamanAbsensi(container) {
                     <div class="mt-8 pt-6 border-t border-slate-200">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
                             <h4 class="font-bold text-sm text-slate-600"><i class="fa-solid fa-clock-rotate-left mr-2 text-indigo-500"></i> Rekam Jejak Kehadiran Anda (Universal):</h4>
-                            <div class="flex items-center space-x-2 bg-slate-50 p-2 border border-slate-200 rounded-lg">
-                                <input type="date" id="filter-hist-start" value="${todayISO}" class="border border-slate-200 rounded p-1 text-xs focus:outline-indigo-500">
+                            <div class="flex items-center space-x-2 bg-slate-50 p-2 border border-slate-200 rounded-lg w-full sm:w-auto">
+                                <input type="date" id="filter-hist-start" value="${todayISO}" class="border border-slate-200 rounded p-1 text-xs focus:outline-indigo-500 flex-1">
                                 <span class="text-xs font-bold text-slate-400">-</span>
-                                <input type="date" id="filter-hist-end" value="${todayISO}" class="border border-slate-200 rounded p-1 text-xs focus:outline-indigo-500">
+                                <input type="date" id="filter-hist-end" value="${todayISO}" class="border border-slate-200 rounded p-1 text-xs focus:outline-indigo-500 flex-1">
                                 <button onclick="window.filterTabelHistori()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-xs font-bold transition"><i class="fa-solid fa-filter"></i></button>
                             </div>
                         </div>
@@ -1825,10 +1997,12 @@ export async function renderHalamanAbsensi(container) {
                         <span class="flex items-center"><i class="fa-solid fa-person-walking-arrow-right text-orange-500 mr-3 text-2xl group-hover:scale-110 transition"></i> Izin Keluar Lokasi</span>
                         <i class="fa-solid fa-arrow-right text-slate-300"></i>
                     </button>
+                    ${hasPresensiPlus ? `
                     <button onclick="window.bukaModalSusulan()" class="bg-white hover:bg-blue-50 text-slate-600 hover:text-blue-600 p-5 rounded-xl font-black transition shadow-lg border border-slate-200 hover:border-blue-200 flex items-center justify-between group">
                         <span class="flex items-center"><i class="fa-solid fa-clock-rotate-left text-blue-500 mr-3 text-2xl group-hover:scale-110 transition"></i> Ajukan Presensi Susulan</span>
                         <i class="fa-solid fa-arrow-right text-slate-300"></i>
                     </button>
+                    ` : ''}
                 </div>
             </div>
         </div>
@@ -1836,7 +2010,6 @@ export async function renderHalamanAbsensi(container) {
 
     window.filterTabelHistori(); 
     window.jalankanJam();
-    // Buka UI Presensi jika bukan hari libur
     if(opsiJabatan && !(isLiburPekanan || isTanggalMerah)) window.gantiUIAbsen(); 
 }
 
@@ -2555,5 +2728,365 @@ window.simpanWewenangMatrix = async function() {
         alert("Gagal menyimpan wewenang! Pastikan internet stabil.");
         btn.innerHTML = '<i class="fa-solid fa-save mr-2"></i> Simpan Matriks Wewenang';
         btn.disabled = false;
+    }
+};
+
+// ==========================================
+// KONTROL PRESENSI RAPAT (FITUR KHUSUS)
+// ==========================================
+window.bukaModalRapat = function() {
+    const pegawais = window.appState.pegawai || [];
+    let chkPegawai = pegawais.map(p => `
+        <label class="flex items-center gap-2 p-1.5 hover:bg-slate-100 rounded cursor-pointer border-b border-slate-100">
+            <input type="checkbox" name="rapat-peserta-chk" value="${p.id}" class="w-4 h-4 text-purple-600 rounded">
+            <span class="text-xs font-bold text-slate-700">${p.nama} <span class="text-[9px] text-slate-400">(${p.hakAkses})</span></span>
+        </label>
+    `).join('');
+
+    if (typeof Swal !== 'undefined') {
+        Swal.fire({
+            title: 'Buat Jadwal Rapat Baru',
+            html: `
+                <input type="text" id="rapat-judul" class="w-full border-2 border-slate-200 p-3 rounded-xl font-bold focus:outline-purple-500 text-center mb-3" placeholder="Judul Rapat..." required>
+                <textarea id="rapat-deskripsi" rows="2" class="w-full border-2 border-slate-200 p-3 rounded-xl font-medium focus:outline-purple-500 mb-3" placeholder="Deskripsi/Agenda rapat..." required></textarea>
+                <div class="grid grid-cols-2 gap-3 mb-3 text-left">
+                    <div><label class="text-[10px] font-bold text-slate-500 uppercase">Tgl Mulai</label><input type="date" id="rapat-tgl" class="w-full border-2 border-slate-200 p-2.5 rounded-xl font-bold focus:outline-purple-500" required></div>
+                    <div><label class="text-[10px] font-bold text-slate-500 uppercase">Pukul</label><input type="time" id="rapat-wkt" class="w-full border-2 border-slate-200 p-2.5 rounded-xl font-bold focus:outline-purple-500" required></div>
+                </div>
+                
+                <label class="text-[10px] font-bold text-slate-500 uppercase block text-left mb-1">Target Peserta (Wajib Hadir):</label>
+                <div class="mb-3 max-h-40 overflow-y-auto border-2 border-slate-200 p-2 rounded-xl text-left bg-slate-50 custom-scrollbar">
+                    <label class="flex items-center gap-2 p-1.5 hover:bg-purple-100 bg-purple-50 rounded cursor-pointer border-b border-purple-200 mb-1">
+                        <input type="checkbox" onchange="document.querySelectorAll('input[name=\\'rapat-peserta-chk\\']').forEach(cb => cb.checked = this.checked)" class="w-4 h-4 text-purple-600 rounded">
+                        <span class="text-xs font-black text-purple-800">Pilih Semua Pegawai</span>
+                    </label>
+                    ${chkPegawai || '<p class="text-xs text-slate-400 text-center py-2">Belum ada pegawai</p>'}
+                </div>
+
+                <label class="text-[10px] font-bold text-slate-500 uppercase block text-left mb-1">Nominal Honor Rapat (Rp):</label>
+                <input type="number" id="rapat-nominal" class="w-full border-2 border-slate-200 p-3 rounded-xl font-black text-purple-700 focus:outline-purple-500 text-center" placeholder="Ketik 0 jika gratis/rutin" required>
+            `,
+            showCancelButton: true,
+            confirmButtonText: '<i class="fa-solid fa-save mr-1"></i> Buat Rapat',
+            confirmButtonColor: '#7e22ce',
+            cancelButtonText: 'Batal',
+            preConfirm: () => {
+                const judul = document.getElementById('rapat-judul').value;
+                const deskripsi = document.getElementById('rapat-deskripsi').value;
+                const tgl = document.getElementById('rapat-tgl').value;
+                const wkt = document.getElementById('rapat-wkt').value;
+                const nominal = document.getElementById('rapat-nominal').value;
+                const peserta = Array.from(document.querySelectorAll('input[name="rapat-peserta-chk"]:checked')).map(cb => cb.value);
+                
+                if (!judul || !deskripsi || !tgl || !wkt || nominal === '' || peserta.length === 0) { 
+                    Swal.showValidationMessage('Semua kolom wajib diisi & minimal 1 peserta dipilih!'); return false; 
+                }
+                return { judul, deskripsi, tgl, wkt, nominal: Number(nominal), peserta };
+            }
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                Swal.fire({title: 'Membuat Jadwal...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+                try {
+                    const { db, app } = await import('./firebase-init.js');
+                    const { collection, addDoc } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
+                    const { getDatabase, ref, push } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js');
+                    
+                    const now = new Date();
+                    await addDoc(collection(db, "Rapat"), {
+                        judul: result.value.judul, deskripsi: result.value.deskripsi,
+                        tanggalMulai: result.value.tgl, waktuMulai: result.value.wkt,
+                        nominalHonor: result.value.nominal, peserta: result.value.peserta,
+                        status: "Aktif", pembuat: window.currentUser.nama,
+                        waktuBuka: now.toLocaleTimeString('id-ID', { hour: '2-digit', minute:'2-digit' }),
+                        tanggal: window.getLocalISOString(), createdAt: now.toISOString()
+                    });
+
+                    // BROADCAST NOTIFIKASI
+                    await push(ref(getDatabase(app), 'Pemberitahuan'), {
+                        judul: `[Undangan Rapat] ${result.value.judul}`,
+                        isi: `Jadwal: ${result.value.tgl.split('-').reverse().join('/')} pkl ${result.value.wkt}. Agenda: ${result.value.deskripsi}.`,
+                        pengirim: window.currentUser.nama, timestamp: Date.now()
+                    });
+
+                    Swal.fire('Berhasil!', 'Rapat terjadwal dan notifikasi terkirim ke seluruh pegawai.', 'success');
+                    window.navigate('absensi'); 
+                } catch(e) { Swal.fire('Error', 'Gagal membuka rapat.', 'error'); }
+            }
+        });
+    } else { alert('Gagal memuat UI. Coba muat ulang halaman.'); }
+};
+
+window.editModalRapat = async function(idRapat) {
+    Swal.fire({title: 'Memuat Data...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+    try {
+        const { db, app } = await import('./firebase-init.js');
+        const { doc, getDoc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
+        const { getDatabase, ref, push } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js');
+        
+        const rSnap = await getDoc(doc(db, "Rapat", idRapat));
+        if(!rSnap.exists()) return Swal.fire('Error', 'Data tidak ditemukan', 'error');
+        const data = rSnap.data();
+
+        const pegawais = window.appState.pegawai || [];
+        let chkPegawai = pegawais.map(p => `
+            <label class="flex items-center gap-2 p-1.5 hover:bg-slate-100 rounded cursor-pointer border-b border-slate-100">
+                <input type="checkbox" name="rapat-peserta-chk" value="${p.id}" class="w-4 h-4 text-amber-600 rounded" ${(data.peserta||[]).includes(p.id)?'checked':''}>
+                <span class="text-xs font-bold text-slate-700">${p.nama} <span class="text-[9px] text-slate-400">(${p.hakAkses})</span></span>
+            </label>
+        `).join('');
+
+        Swal.fire({
+            title: 'Revisi Data Rapat',
+            html: `
+                <input type="text" id="rapat-judul" value="${data.judul}" class="w-full border-2 border-slate-200 p-3 rounded-xl font-bold focus:outline-amber-500 text-center mb-3" placeholder="Judul rapat" required>
+                <textarea id="rapat-deskripsi" rows="2" class="w-full border-2 border-slate-200 p-3 rounded-xl font-medium focus:outline-amber-500 mb-3" placeholder="Deskripsi/Agenda...">${data.deskripsi||''}</textarea>
+                <div class="grid grid-cols-2 gap-3 mb-3 text-left">
+                    <div><label class="text-[10px] font-bold text-slate-500 uppercase">Tgl Mulai</label><input type="date" id="rapat-tgl" value="${data.tanggalMulai||''}" class="w-full border-2 border-slate-200 p-2.5 rounded-xl font-bold focus:outline-amber-500" required></div>
+                    <div><label class="text-[10px] font-bold text-slate-500 uppercase">Pukul</label><input type="time" id="rapat-wkt" value="${data.waktuMulai||''}" class="w-full border-2 border-slate-200 p-2.5 rounded-xl font-bold focus:outline-amber-500" required></div>
+                </div>
+                
+                <label class="text-[10px] font-bold text-slate-500 uppercase block text-left mb-1">Revisi Peserta:</label>
+                <div class="mb-3 max-h-40 overflow-y-auto border-2 border-slate-200 p-2 rounded-xl text-left bg-slate-50 custom-scrollbar">
+                    <label class="flex items-center gap-2 p-1.5 hover:bg-amber-100 bg-amber-50 rounded cursor-pointer border-b border-amber-200 mb-1">
+                        <input type="checkbox" onchange="document.querySelectorAll('input[name=\\'rapat-peserta-chk\\']').forEach(cb => cb.checked = this.checked)" class="w-4 h-4 text-amber-600 rounded">
+                        <span class="text-xs font-black text-amber-800">Pilih Semua Pegawai</span>
+                    </label>
+                    ${chkPegawai || '<p class="text-xs text-slate-400 text-center py-2">Belum ada pegawai</p>'}
+                </div>
+
+                <label class="text-[10px] font-bold text-slate-500 uppercase block text-left mb-1">Revisi Honor (Rp):</label>
+                <input type="number" id="rapat-nominal" value="${data.nominalHonor||0}" class="w-full border-2 border-slate-200 p-3 rounded-xl font-black text-amber-700 focus:outline-amber-500 text-center" required>
+            `,
+            showCancelButton: true,
+            confirmButtonText: '<i class="fa-solid fa-save mr-1"></i> Simpan Revisi',
+            confirmButtonColor: '#f59e0b',
+            cancelButtonText: 'Batal',
+            preConfirm: () => {
+                const judul = document.getElementById('rapat-judul').value;
+                const deskripsi = document.getElementById('rapat-deskripsi').value;
+                const tgl = document.getElementById('rapat-tgl').value;
+                const wkt = document.getElementById('rapat-wkt').value;
+                const nominal = document.getElementById('rapat-nominal').value;
+                const peserta = Array.from(document.querySelectorAll('input[name="rapat-peserta-chk"]:checked')).map(cb => cb.value);
+                
+                if (!judul || !deskripsi || !tgl || !wkt || nominal==='' || peserta.length===0) { 
+                    Swal.showValidationMessage('Semua kolom wajib diisi & minimal 1 peserta dipilih!'); return false; 
+                }
+                return { judul, deskripsi, tgl, wkt, nominal: Number(nominal), peserta };
+            }
+        }).then(async (res) => {
+            if (res.isConfirmed) {
+                Swal.fire({title: 'Menyimpan...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+                await updateDoc(doc(db, "Rapat", idRapat), {
+                    judul: res.value.judul, deskripsi: res.value.deskripsi,
+                    tanggalMulai: res.value.tgl, waktuMulai: res.value.wkt,
+                    nominalHonor: res.value.nominal, peserta: res.value.peserta,
+                    updatedAt: new Date().toISOString()
+                });
+                
+                await push(ref(getDatabase(app), 'Pemberitahuan'), {
+                    judul: `[Revisi Jadwal] ${res.value.judul}`,
+                    isi: `Mohon perhatikan jadwal baru: ${res.value.tgl.split('-').reverse().join('/')} pkl ${res.value.wkt}. Agenda: ${res.value.deskripsi}.`,
+                    pengirim: window.currentUser.nama, timestamp: Date.now()
+                });
+
+                Swal.fire('Berhasil!', 'Jadwal rapat direvisi dan notifikasi perubahan telah disiarkan.', 'success');
+                window.navigate('absensi');
+            }
+        });
+    } catch(e) { Swal.fire('Error', 'Gagal memuat data', 'error'); }
+};
+
+window.hadirRapat = async function(idRapat, judul) {
+    if (typeof Swal !== 'undefined') Swal.fire({title: 'Merekam Kehadiran...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+    try {
+        const { db } = await import('./firebase-init.js');
+        const { collection, addDoc, doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
+        
+        const rapatSnap = await getDoc(doc(db, "Rapat", idRapat));
+        const nominalHonor = rapatSnap.exists() ? (rapatSnap.data().nominalHonor || 0) : 0;
+
+        const now = new Date();
+        await addDoc(collection(db, "Absensi"), {
+            idGuru: window.currentUser.id,
+            namaGuru: window.currentUser.nama,
+            tanggal: window.getLocalISOString(),
+            waktu: now.toLocaleTimeString('id-ID', { hour: '2-digit', minute:'2-digit' }),
+            tipe: 'Rapat',
+            status: 'Hadir Rapat',
+            idRapat: idRapat,
+            honorRapat: nominalHonor, 
+            keterangan: `Hadir Rapat: ${judul}`,
+            jabatan: window.currentUser.hakAkses || 'Pegawai',
+            kelas: '-', mapel: '-', jamTxt: '-', terlambat: 0,
+            createdAt: now.toISOString()
+        });
+        if (typeof Swal !== 'undefined') Swal.fire('Berhasil!', 'Kehadiran rapat Anda telah tercatat dan masuk ke Histori.', 'success');
+        else alert('Berhasil tercatat!');
+        window.navigate('absensi');
+    } catch(e) { 
+        if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal merekam presensi rapat.', 'error');
+        else alert('Gagal');
+    }
+};
+
+window.tutupRapat = async function(idRapat) {
+    if(typeof Swal !== 'undefined') {
+        Swal.fire({
+            title: 'Tutup Sesi Rapat?',
+            text: "Pegawai tidak akan bisa melakukan presensi untuk rapat ini lagi.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'Ya, Tutup Rapat',
+            cancelButtonText: 'Batal'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                Swal.fire({title: 'Menutup Sesi...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+                try {
+                    const { db } = await import('./firebase-init.js');
+                    const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
+                    await updateDoc(doc(db, "Rapat", idRapat), { status: "Selesai", closedAt: new Date().toISOString() });
+                    Swal.fire('Ditutup!', 'Presensi rapat telah diakhiri.', 'success');
+                    window.navigate('absensi');
+                } catch(e) { Swal.fire('Error', 'Gagal menutup rapat', 'error'); }
+            }
+        });
+    }
+};
+
+// ==========================================
+// POP-UP MASA UJI COBA (TRIAL)
+// ==========================================
+window.tampilkanPopupTrial = function() {
+    const lembaga = (window.appState && window.appState.lembaga && window.appState.lembaga[0]) ? window.appState.lembaga[0] : {};
+    const trialEnd = lembaga.masaUjiCobaAkhir || "";
+    
+    if (trialEnd) {
+        const today = new Date().toISOString().split('T')[0];
+        if (today <= trialEnd) {
+            if (!document.getElementById('trial-popup-banner')) {
+                const div = document.createElement('div');
+                div.id = 'trial-popup-banner';
+                div.className = 'fixed bottom-4 right-4 z-[9999] bg-gradient-to-r from-amber-500 to-orange-600 text-white p-5 rounded-2xl shadow-2xl flex items-center gap-4 max-w-sm border-2 border-white animate-fade-in';
+                div.innerHTML = `
+                    <i class="fa-solid fa-triangle-exclamation text-4xl animate-pulse"></i>
+                    <div>
+                        <h4 class="font-black text-sm uppercase tracking-wider">Masa Uji Coba Aktif!</h4>
+                        <p class="text-[10px] font-bold mt-1 leading-relaxed text-yellow-100">Sistem Premium berjalan otomatis hingga batas <b>${trialEnd}</b>. Segera hubungi Super Admin untuk melanjutkan berlangganan.</p>
+                    </div>
+                    <button onclick="this.parentElement.remove()" class="text-white hover:text-red-200 absolute top-2 right-2"><i class="fa-solid fa-times"></i></button>
+                `;
+                document.body.appendChild(div);
+                
+                if(typeof Swal !== 'undefined' && !window.hasShownTrialAlert) {
+                    Swal.fire({
+                        title: 'TRIAL PREMIUM AKTIF!',
+                        html: `Sistem mendeteksi Anda sedang berada dalam masa <b>Uji Coba</b> yang akan berakhir pada tanggal <b class="text-amber-600">${trialEnd}</b>.<br><br>Seluruh modul dan fitur lanjutan saat ini telah terbuka. Harap ingatkan bagian terkait untuk segera melunasi pembayaran sebelum sistem mengunci fitur secara otomatis pada tanggal tersebut.`,
+                        icon: 'info',
+                        confirmButtonText: 'Ya, Saya Mengerti',
+                        confirmButtonColor: '#f59e0b',
+                        backdrop: `rgba(0,0,0,0.8)`
+                    });
+                    window.hasShownTrialAlert = true;
+                }
+            }
+        }
+    }
+};
+
+// ==========================================
+// HALAMAN PENGATURAN PAKET LISENSI MODULAR (KHUSUS SA)
+// ==========================================
+export function renderHalamanLisensi(container) {
+    if(typeof window.tampilkanPopupTrial === 'function') window.tampilkanPopupTrial();
+
+    const profilLembaga = window.appState.lembaga[0] || {};
+    const fiturAktif = profilLembaga.lisensiFitur || []; 
+    const trialEnd = profilLembaga.masaUjiCobaAkhir || "";
+
+    const chk = (kode, nama, desc, icon) => `
+        <label class="flex items-start p-4 border-2 border-slate-200 rounded-2xl cursor-pointer hover:bg-amber-50 hover:border-amber-400 transition bg-white shadow-sm group">
+            <input type="checkbox" name="fitur-premium-chk" value="${kode}" class="mt-1 w-6 h-6 text-amber-500 rounded cursor-pointer accent-amber-500" ${fiturAktif.includes(kode) ? 'checked' : ''}>
+            <div class="ml-4">
+                <span class="font-black text-slate-800 text-lg group-hover:text-amber-700 block mb-1"><i class="fa-solid ${icon} text-amber-500 mr-2"></i> ${nama}</span>
+                <span class="text-xs font-bold text-slate-500 leading-relaxed block">${desc}</span>
+            </div>
+        </label>
+    `;
+
+    container.innerHTML = `
+        <div class="bg-white rounded-3xl shadow-xl w-full p-8 md:p-10 flex flex-col border-t-4 border-amber-500 relative">
+            <div class="absolute top-0 right-0 p-8 opacity-5 pointer-events-none"><i class="fa-solid fa-store text-9xl text-amber-500"></i></div>
+            <div class="flex justify-between items-start mb-6 border-b border-slate-100 pb-6 relative z-10">
+                <div>
+                    <h2 class="text-3xl font-black text-slate-800"><i class="fa-solid fa-store text-amber-500 mr-3"></i> Manajemen Modul Aplikasi</h2>
+                    <p class="text-sm font-bold text-slate-500 mt-2">Atur modul premium apa saja yang telah dilanggan dan berhak diakses oleh lembaga ini.</p>
+                </div>
+            </div>
+            
+            <form onsubmit="window.simpanLisensiPage(event)" class="relative z-10 flex flex-col">
+                <div class="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 p-6 rounded-2xl shadow-sm">
+                    <h4 class="font-black text-blue-900 mb-2 uppercase tracking-wider"><i class="fa-solid fa-clock-rotate-left text-blue-600 mr-2"></i> Pengaturan Masa Uji Coba (Trial)</h4>
+                    <p class="text-xs font-bold text-blue-700 mb-4">Selama masa uji coba belum terlewat, semua modul akan <b class="bg-blue-200 px-1 rounded">TERBUKA OTOMATIS</b> meskipun tidak dicentang di bawah ini.</p>
+                    <label class="text-[10px] font-black text-slate-500 uppercase block mb-1">Berlaku Sampai Tanggal:</label>
+                    <input type="date" id="lisensi-trial-date" value="${trialEnd}" class="border-2 border-white p-3 rounded-xl w-full md:w-1/3 font-bold text-blue-800 focus:outline-blue-500 shadow-sm cursor-pointer">
+                    <button type="button" onclick="document.getElementById('lisensi-trial-date').value=''" class="ml-2 text-xs font-bold text-red-500 hover:text-red-700 transition">Hapus Trial</button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                    ${chk('presensi_plus', 'Presensi Rapat & Pro', 'Modul jadwal rapat interaktif, absensi susulan, deteksi kalender libur, serta mode kedisiplinan Super Ketat (GPS).', 'fa-users-viewfinder')}
+                    ${chk('kalender_plus', 'Kalender Lanjutan', 'Integrasi kalender Hijriah otomatis, pengulangan agenda tahunan, dan notifikasi hari nasional di dasbor.', 'fa-calendar-plus')}
+                    ${chk('raport_plus', 'E-Raport Pro & CBT', 'Fitur input nilai rapor massal (bulk entry), tarik nilai CBT otomatis, dan arsip raport permanen.', 'fa-laptop-code')}
+                    ${chk('keuangan_plus', 'Keuangan Terpadu', 'Pembayaran SPP yang terhubung langsung ke Portal Ortu, modul manajemen Beasiswa, dan Input Kas Massal.', 'fa-sack-dollar')}
+                    ${chk('tahfidz_plus', 'Analitik Tahfidz', 'Grafik perkembangan visual capaian santri, riwayat detail, dan widget laporan kepengasuhan di dasbor utama.', 'fa-chart-line')}
+                    ${chk('ortu_portal', 'Akses Portal Ortu', 'Sistem pengiriman notifikasi khusus / tagihan ke aplikasi wali murid, serta pantauan kehadiran secara realtime.', 'fa-mobile-screen')}
+                    ${chk('tugas_pegawai', 'Manajemen Tugas', 'Papan Kanban Kanban board interaktif untuk pendelegasian tugas pegawai dan pemberitahuan realtime.', 'fa-list-check')}
+                    ${chk('ppdb_online', 'Sistem PPDB Online', 'Web publik pendaftaran siswa baru yang bisa auto-sinkron ke Sisfo, integrasi QRIS, dan tombol lulus/gagal.', 'fa-address-card')}
+                </div>
+                
+                <div class="bg-amber-50 p-6 border border-amber-200 rounded-2xl mb-8 flex items-start">
+                    <i class="fa-solid fa-triangle-exclamation text-3xl text-amber-500 mr-4 mt-1"></i>
+                    <p class="text-sm font-bold text-amber-800 leading-relaxed">Peringatan: Jika Masa Trial kosong/berakhir, Modul yang tidak dicentang di sini akan otomatis "digembok" dan dihilangkan dari tampilan menu seluruh akun pegawai secara instan.</p>
+                </div>
+
+                <div class="flex justify-end">
+                    <button type="submit" id="btn-simpan-lisensi-page" class="w-full md:w-auto md:px-12 bg-slate-800 hover:bg-slate-900 text-white font-black py-4 rounded-xl shadow-lg transition transform hover:-translate-y-1 text-lg"><i class="fa-solid fa-save mr-2"></i> Terapkan & Gembok Sistem</button>
+                </div>
+            </form>
+        </div>
+    `;
+}
+
+window.simpanLisensiPage = async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-simpan-lisensi-page');
+    const ori = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Menerapkan Gembok...';
+    btn.disabled = true;
+
+    const checkedFitur = Array.from(document.querySelectorAll('input[name="fitur-premium-chk"]:checked')).map(cb => cb.value);
+    const trialDate = document.getElementById('lisensi-trial-date').value;
+    const profilLembaga = window.appState.lembaga[0];
+
+    if (!profilLembaga || !profilLembaga.id) {
+        alert("Lembaga belum terdaftar! Silakan isi Data Lembaga terlebih dahulu.");
+        btn.innerHTML = ori; btn.disabled = false; return;
+    }
+
+    try {
+        const { db } = await import('./firebase-init.js');
+        const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
+        
+        await updateDoc(doc(db, "Lembaga", profilLembaga.id), { lisensiFitur: checkedFitur, masaUjiCobaAkhir: trialDate });
+        window.appState.lembaga[0].lisensiFitur = checkedFitur;
+        window.appState.lembaga[0].masaUjiCobaAkhir = trialDate;
+        
+        alert("Sistem berhasil diperbarui! Gembok dan akses fitur telah diselaraskan dengan modul dan masa trial yang dipilih.");
+        window.navigate('dashboard'); 
+        location.reload(); 
+    } catch(err) {
+        alert('Terjadi kesalahan saat mengubah lisensi: ' + err.message);
+        btn.innerHTML = ori; btn.disabled = false;
     }
 };
