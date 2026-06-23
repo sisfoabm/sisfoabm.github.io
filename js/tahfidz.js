@@ -112,6 +112,10 @@ window.autofillBulkJuz = function(selectElem, id) {
 
 export async function renderHalamanTahfidz(container) {
     const currentUser = window.currentUser || {};
+    const lembaga = window.appState.lembaga[0] || {};
+    // --- GEMBOK MODULAR ---
+    const isPremium = (lembaga.lisensiFitur || []).includes('tahfidz_plus');
+
     const isSA_Admin = ['Super Admin', 'Administrator', 'Operator/TU'].includes(currentUser.hakAkses);
     const userJabs = (currentUser.detailJabatan || []).map(j => j.namaJabatan.toLowerCase());
     const isHead = userJabs.some(j => j.includes('kepala') || j.includes('ketua') || j.includes('mudir'));
@@ -124,7 +128,9 @@ export async function renderHalamanTahfidz(container) {
     let optAnak = anakList.map(a => `<option value="${a.id}|${a.nama}">${a.nama} (${a.kelas || '-'})</option>`).join('');
 
     let optSurah = '<option value="">Pilih Surah...</option>';
-    DAFTAR_SURAH.forEach(s => optSurah += `<option value="${s}">${s}</option>`);
+    if(typeof DAFTAR_SURAH !== 'undefined') {
+        DAFTAR_SURAH.forEach(s => optSurah += `<option value="${s}">${s}</option>`);
+    }
 
     let optJuz = '<option value="">Pilih Juz...</option>';
     for(let i=1; i<=30; i++) optJuz += `<option value="${i}">Juz ${i}</option>`;
@@ -174,7 +180,6 @@ export async function renderHalamanTahfidz(container) {
         
         <form id="form-tahfidz" onsubmit="window.simpanTahfidz(event)">
             
-            <!-- AREA SINGLE MODE -->
             <div id="area-single-tahfidz">
                 <div class="grid grid-cols-1 mb-6">
                     <label class="text-xs font-bold text-slate-700 uppercase mb-1 block">Pilih Santri Binaan Anda</label>
@@ -184,7 +189,6 @@ export async function renderHalamanTahfidz(container) {
                 </div>
 
                 <div class="grid grid-cols-1 gap-y-6">
-                    <!-- ZIYADAH -->
                     <div class="bg-teal-50 p-5 rounded-xl border border-teal-100">
                         <h4 class="font-black text-lg text-teal-800 flex items-center mb-3"><i class="fa-regular fa-sun mr-2"></i> Ziyadah (Hafalan Baru)</h4>
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -203,7 +207,6 @@ export async function renderHalamanTahfidz(container) {
                         </div>
                     </div>
 
-                    <!-- MURAJA'AH -->
                     <div class="bg-amber-50 p-5 rounded-xl border border-amber-100">
                         <h4 class="font-black text-lg text-amber-800 flex items-center mb-3"><i class="fa-solid fa-rotate-left mr-2"></i> Muraja'ah (Pengulangan)</h4>
                         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 border-b border-amber-200 pb-4">
@@ -241,9 +244,7 @@ export async function renderHalamanTahfidz(container) {
                 </div>
             </div>
 
-            <!-- AREA BULK (TABEL MASSAL) -->
             <div id="area-bulk-tahfidz" class="hidden space-y-6">
-                <!-- TABEL ZIYADAH -->
                 <div class="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-inner">
                     <div class="bg-teal-100 border-b border-teal-200 p-3 font-black text-teal-800 flex justify-between items-center"><span class="flex items-center"><i class="fa-regular fa-sun mr-2"></i> Input Massal Ziyadah (Hafalan Baru)</span><button type="button" class="text-xs bg-white text-teal-700 px-2 py-1 rounded shadow-sm font-bold" onclick="window.saveLocalTahfidz()">Save Draft</button></div>
                     <div class="overflow-x-auto custom-scrollbar p-2">
@@ -264,7 +265,6 @@ export async function renderHalamanTahfidz(container) {
                     </div>
                 </div>
 
-                <!-- TABEL MURAJA'AH -->
                 <div class="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-inner">
                     <div class="bg-amber-100 border-b border-amber-200 p-3 font-black text-amber-800 flex justify-between items-center"><span class="flex items-center"><i class="fa-solid fa-rotate-left mr-2"></i> Input Massal Muraja'ah (Pengulangan)</span><button type="button" class="text-xs bg-white text-amber-700 px-2 py-1 rounded shadow-sm font-bold" onclick="window.saveLocalTahfidz()">Save Draft</button></div>
                     <div class="overflow-x-auto custom-scrollbar p-2">
@@ -304,8 +304,8 @@ export async function renderHalamanTahfidz(container) {
         </div>
     </div>
 
-    <!-- MODAL GRAFIK & RUBRIK -->
-    <div class="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
+    ${isPremium ? `
+    <div class="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 mt-6">
         <h3 class="font-black text-slate-800 mb-4 border-b pb-3"><i class="fa-solid fa-chart-line mr-2 text-teal-500"></i> Analitik Kualitas & Riwayat Tahfidz</h3>
         <div class="flex flex-col md:flex-row gap-4 mb-6">
             <select id="grafik-siswa" class="w-full border-2 border-slate-200 p-3 rounded-xl font-bold bg-slate-50 focus:outline-teal-500 cursor-pointer">
@@ -318,6 +318,15 @@ export async function renderHalamanTahfidz(container) {
             <canvas id="canvasTahfidz"></canvas>
         </div>
     </div>
+    ` : `
+    <div class="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 mt-6 opacity-70 cursor-not-allowed">
+        <div class="text-center p-6 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+            <i class="fa-solid fa-lock text-4xl text-slate-400 mb-3 block"></i>
+            <h3 class="font-black text-slate-700">Analitik Kualitas & Riwayat Grafik</h3>
+            <p class="text-xs font-bold text-slate-500 mt-1">Fitur Grafik Santri secara visual eksklusif untuk Analitik Tahfidz (Premium).</p>
+        </div>
+    </div>
+    `}
 
     <div id="modal-rubrik-tahfidz" class="fixed inset-0 bg-slate-900/80 z-[200] flex items-center justify-center p-4 backdrop-blur-sm hidden animate-fade-in">
         <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col border-t-4 border-indigo-500">
