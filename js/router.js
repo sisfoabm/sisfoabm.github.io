@@ -104,13 +104,17 @@ window.renderSidebarMenu = function() {
     
     // Kunci Akses Khusus
     const isSuperAdmin = currentUser.hakAkses === 'Super Admin';
+    const isAdministrator = currentUser.hakAkses === 'Administrator';
+    const isSA_Admin = isSuperAdmin || isAdministrator;
+    
     const isKepala = (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('kepala'));
     const userJabatans = (currentUser.detailJabatan || []).map(j => j.namaJabatan);
     
     const wewenangMatrix = lembaga.wewenangMatrix || {};
 
     let allowedMenuIds = new Set();
-    if (isSuperAdmin) {
+    // Administrator & SA otomatis mendapatkan semua menu
+    if (isSA_Admin) {
         MENU_ITEMS.forEach(m => allowedMenuIds.add(m.id));
     } else {
         allowedMenuIds.add('dashboard'); 
@@ -122,12 +126,11 @@ window.renderSidebarMenu = function() {
         });
     }
 
-    if (!isSuperAdmin) allowedMenuIds.delete('lisensi'); // Lisensi murni hanya SA
+    if (!isSuperAdmin) allowedMenuIds.delete('lisensi'); // Lisensi murni 100% hanya SA
 
     const filteredMenus = MENU_ITEMS.filter(m => allowedMenuIds.has(m.id));
     const sidebar = document.getElementById('app-sidebar');
     
-    // Tentukan teks status lisensi
     const trialEnd = lembaga.masaUjiCobaAkhir || "";
     let statusLisensi = "Lisensi Standar";
     if (trialEnd) {
@@ -154,7 +157,6 @@ window.renderSidebarMenu = function() {
                     let btnClass = window.currentPage === m.id ? 'bg-blue-50 text-blue-600 font-bold' : 'text-slate-600 hover:bg-blue-50 dark:hover:bg-slate-700';
                     let iClass = window.currentPage === m.id ? 'text-blue-500' : 'text-slate-400';
                     
-                    // Warna khusus untuk tab tertentu
                     if (m.id === 'lembaga') {
                         btnClass = window.currentPage === m.id ? 'bg-rose-100 text-rose-800 font-bold' : 'text-rose-800 bg-rose-50 hover:bg-rose-100 hover:text-rose-900';
                         iClass = window.currentPage === m.id ? 'text-rose-700' : 'text-rose-600';
@@ -697,17 +699,19 @@ window.navigate = function(page) {
     const lembaga = window.appState.lembaga[0] || {};
     
     const isSuperAdmin = currentUser.hakAkses === 'Super Admin';
-    const isSA_Only = currentUser.hakAkses === 'Super Admin' || currentUser.hakAkses === 'Administrator';
+    const isAdministrator = currentUser.hakAkses === 'Administrator';
+    const isSA_Admin = isSuperAdmin || isAdministrator;
+    
     const isOpTU = currentUser.hakAkses === 'Operator/TU';
     const isKepala = (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('kepala'));
-    const isHead = isSA_Only || isKepala || (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('ketua'));
+    const isHead = isSA_Admin || isKepala || (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('ketua'));
     
-    const canPostAnnounce = isSA_Only || isOpTU || isHead;
+    const canPostAnnounce = isSA_Admin || isOpTU || isHead;
     const wewenangMatrix = lembaga.wewenangMatrix || {};
     
     let hasAccess = false;
     
-    if (isSuperAdmin || page === 'dashboard') {
+    if (isSA_Admin || page === 'dashboard') {
         hasAccess = true;
     } else if (page === 'ppdb' && isKepala) {
         hasAccess = true; 
@@ -728,7 +732,6 @@ window.navigate = function(page) {
     if (titleEl) titleEl.innerText = page.replace('-', ' ').toUpperCase();
     const container = document.getElementById('view-container');
     
-    // --- GEMBOK MODULAR (LAYAR SEGEL PENUH UNTUK HALAMAN UTAMA) ---
     if (page === 'tugas' && !window.cekLisensi('tugas_pegawai')) return container.innerHTML = window.renderLockedPremiumHTML('Manajemen Tugas Pegawai (Kanban)');
     if (page === 'ppdb' && !window.cekLisensi('ppdb_online')) return container.innerHTML = window.renderLockedPremiumHTML('Sistem PPDB Online & QRIS');
     if (page === 'kalender' && !window.cekLisensi('kalender_plus')) return container.innerHTML = window.renderLockedPremiumHTML('Kalender Pendidikan Terpadu');
@@ -743,7 +746,8 @@ window.navigate = function(page) {
 
         const userJabs = (currentUser.detailJabatan || []).map(j => j.namaJabatan);
         
-        if (isSuperAdmin && userJabs.length === 0) { Object.assign(config, savedConfig['Global'] || defConfig); } 
+        // Administrator & SA melihat Global Dasbor jika belum punya konfigurasi spesifik
+        if (isSA_Admin && userJabs.length === 0) { Object.assign(config, savedConfig['Global'] || defConfig); } 
         else if (userJabs.length === 0) { Object.assign(config, savedConfig['Global'] || defConfig); } 
         else {
             userJabs.forEach(jab => {
@@ -755,7 +759,7 @@ window.navigate = function(page) {
         let html = `
         <div class="flex justify-between items-center mb-4 md:mb-6">
             <h2 class="text-xl md:text-3xl font-black text-slate-800 tracking-tight">Ringkasan Sistem</h2>
-            ${isSA_Only ? `<button onclick="window.bukaModalAturDasbor()" class="bg-slate-800 hover:bg-slate-900 text-white px-3 md:px-5 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-black shadow-lg transition flex items-center transform hover:-translate-y-1"><i class="fa-solid fa-sliders md:mr-2"></i> <span class="hidden md:inline">Atur Dasbor</span></button>` : ''}
+            ${isSA_Admin ? `<button onclick="window.bukaModalAturDasbor()" class="bg-slate-800 hover:bg-slate-900 text-white px-3 md:px-5 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-black shadow-lg transition flex items-center transform hover:-translate-y-1"><i class="fa-solid fa-sliders md:mr-2"></i> <span class="hidden md:inline">Atur Dasbor</span></button>` : ''}
         </div>
         <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-6 mb-6">
         `;
@@ -823,7 +827,6 @@ window.navigate = function(page) {
             </div>`;
         }
         
-        // PEMBERITAHUAN (BUTUH TUGAS PEGAWAI PLUS)
         if (config.pemberitahuan) {
             if (!window.cekLisensi('tugas_pegawai')) {
                 html += `<div class="bg-slate-50 p-8 rounded-2xl border border-slate-200 text-center"><i class="fa-solid fa-lock text-4xl text-slate-300 mb-3"></i><h4 class="font-bold text-slate-500">Papan Pengumuman</h4><span class="text-[10px] text-amber-500 font-bold mt-1 bg-amber-100 px-2 py-0.5 rounded">Segel Premium</span></div>`;
@@ -848,7 +851,6 @@ window.navigate = function(page) {
             }
         }
 
-        // NOTIF ORTU (BUTUH PORTAL ORTU)
         if (config.notifOrtu && canPostAnnounce) {
             if (!window.cekLisensi('ortu_portal')) {
                 html += `<div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 text-center mb-6"><i class="fa-solid fa-lock text-4xl text-slate-300 mb-3"></i><h4 class="font-bold text-slate-500">Notifikasi Portal Ortu</h4><span class="text-[10px] text-amber-500 font-bold mt-1 bg-amber-100 px-2 py-0.5 rounded">Segel Premium</span></div>`;
