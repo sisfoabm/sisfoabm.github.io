@@ -1,5 +1,5 @@
 import { db } from './firebase-init.js';
-import { collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, addDoc, doc, deleteDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // ==========================================
 // FILE 9: KALENDER.JS (SISTEM KALENDER & HIJRIAH FIRESTORE)
@@ -146,18 +146,27 @@ window.renderKalender = function() {
     
     if (!grid12 || !yearLabel) return;
 
+    // --- CEK LISENSI MODULAR ---
+    const lembaga = (window.appState && window.appState.lembaga && window.appState.lembaga.length > 0) ? window.appState.lembaga[0] : {};
+    const isPremium = (lembaga.lisensiFitur || []).includes('kalender_plus');
+
     yearLabel.textContent = window.currentKalenderYear;
     
     const headerContainer = yearLabel.parentElement;
-    if (headerContainer && !document.getElementById('btn-sync-gcal')) {
-        const syncBtn = document.createElement('button');
-        syncBtn.id = 'btn-sync-gcal';
-        syncBtn.className = 'ml-4 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 px-3 py-1 rounded text-sm font-bold shadow-sm flex items-center transition hidden md:flex';
-        syncBtn.innerHTML = '<i class="fa-brands fa-google text-red-500 mr-2"></i> Sinkron';
-        syncBtn.onclick = window.sinkronGoogleCalendar;
-        headerContainer.appendChild(syncBtn);
+    if (headerContainer && !document.getElementById('btn-sync-gcal') && !document.getElementById('btn-export-csv-kalender')) {
+        
+        // GEMBOK MODULAR: TOMBOL SINKRON G-CAL HANYA JIKA KALENDER PLUS
+        if (isPremium) {
+            const syncBtn = document.createElement('button');
+            syncBtn.id = 'btn-sync-gcal';
+            syncBtn.className = 'ml-4 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 px-3 py-1 rounded text-sm font-bold shadow-sm flex items-center transition hidden md:flex';
+            syncBtn.innerHTML = '<i class="fa-brands fa-google text-red-500 mr-2"></i> Sinkron';
+            syncBtn.onclick = window.sinkronGoogleCalendar;
+            headerContainer.appendChild(syncBtn);
+        }
         
         const exportBtn = document.createElement('button');
+        exportBtn.id = 'btn-export-csv-kalender';
         exportBtn.className = 'ml-2 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 px-3 py-1 rounded text-sm font-bold shadow-sm flex items-center transition';
         exportBtn.innerHTML = '<i class="fa-solid fa-download mr-2"></i> Ekspor CSV';
         exportBtn.onclick = window.eksporKalenderCSV; 
@@ -178,19 +187,15 @@ window.renderKalender = function() {
     const agendas = window.appState.kalender || [];
     const tasks = window.appState.tugas || [];
     
-    // PERBAIKAN 1: Pengecekan Otorisasi Klik Format Baru
-    // PERBAIKAN 1: Pengecekan Otorisasi Klik Format Baru
     const currentUser = window.currentUser || {};
     const isAdminOrKurikulum = currentUser.hakAkses === 'Super Admin' || currentUser.hakAkses === 'Administrator' || currentUser.hakAkses === 'Operator/TU' || (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('kurikulum'));
 
-    // PERBAIKAN 2: Dinamisasi Hari Libur Multi-Hari dari Data Lembaga
-    const lembaga = (window.appState && window.appState.lembaga && window.appState.lembaga.length > 0) ? window.appState.lembaga[0] : {};
     const liburConfig = lembaga.libur || 'Hanya Ahad';
     let liburIndices = [];
     if(liburConfig.toLowerCase().includes('ahad')) liburIndices.push(0);
     if(liburConfig.toLowerCase().includes('jumat') || liburConfig.toLowerCase().includes("jum'at")) liburIndices.push(5);
     if(liburConfig.toLowerCase().includes('sabtu')) liburIndices.push(6);
-    if(liburIndices.length === 0) liburIndices.push(0); // Fallback ke Ahad jika kosong
+    if(liburIndices.length === 0) liburIndices.push(0); 
 
     let allMonthsHTML = '';
 
@@ -216,11 +221,15 @@ window.renderKalender = function() {
 
         let startHijriMonth = '';
         let endHijriMonth = '';
-        try {
-            const hijriFormatter = new Intl.DateTimeFormat('id-ID-u-ca-islamic-umalqura', { month: 'long' });
-            startHijriMonth = hijriFormatter.format(new Date(currentGridYear, m, 1));
-            endHijriMonth = hijriFormatter.format(new Date(currentGridYear, m, daysInMonth));
-        } catch(e) { startHijriMonth = 'Hijriah'; endHijriMonth = 'Hijriah'; }
+        
+        // GEMBOK MODULAR: HIJRIAH HANYA JIKA KALENDER PLUS
+        if (isPremium) {
+            try {
+                const hijriFormatter = new Intl.DateTimeFormat('id-ID-u-ca-islamic-umalqura', { month: 'long' });
+                startHijriMonth = hijriFormatter.format(new Date(currentGridYear, m, 1));
+                endHijriMonth = hijriFormatter.format(new Date(currentGridYear, m, daysInMonth));
+            } catch(e) { startHijriMonth = 'Hijriah'; endHijriMonth = 'Hijriah'; }
+        }
 
         let monthHTML = `
             <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col h-max hover:shadow-md transition-shadow pb-2 avoid-page-break">
@@ -255,13 +264,17 @@ window.renderKalender = function() {
             let hijriSiang = '';
             let hijriMalam = '';
             let hijriMatchStr = '';
-            try {
-                let numSiang = new Intl.DateTimeFormat('id-ID-u-ca-islamic-umalqura', { day: 'numeric' }).format(dateObj);
-                let numMalam = new Intl.DateTimeFormat('id-ID-u-ca-islamic-umalqura', { day: 'numeric' }).format(nextDateObj);
-                hijriSiang = window.toArabicNumeral(numSiang);
-                hijriMalam = window.toArabicNumeral(numMalam);
-                hijriMatchStr = new Intl.DateTimeFormat('id-ID-u-ca-islamic-umalqura', { day: 'numeric', month: 'numeric' }).format(dateObj);
-            } catch(e) {}
+            
+            // GEMBOK MODULAR: HANYA KALKULASI HIJRIAH JIKA KALENDER PLUS
+            if (isPremium) {
+                try {
+                    let numSiang = new Intl.DateTimeFormat('id-ID-u-ca-islamic-umalqura', { day: 'numeric' }).format(dateObj);
+                    let numMalam = new Intl.DateTimeFormat('id-ID-u-ca-islamic-umalqura', { day: 'numeric' }).format(nextDateObj);
+                    hijriSiang = window.toArabicNumeral(numSiang);
+                    hijriMalam = window.toArabicNumeral(numMalam);
+                    hijriMatchStr = new Intl.DateTimeFormat('id-ID-u-ca-islamic-umalqura', { day: 'numeric', month: 'numeric' }).format(dateObj);
+                } catch(e) {}
+            }
 
             let isToday = dateStr === todayStr;
             let isHariLiburPekanan = liburIndices.includes(dateObj.getDay());
@@ -442,6 +455,10 @@ window.renderDashboardKalender = function() {
     
     if (!container || !label) return;
 
+    // --- CEK LISENSI MODULAR ---
+    const lembaga = (window.appState && window.appState.lembaga && window.appState.lembaga.length > 0) ? window.appState.lembaga[0] : {};
+    const isPremium = (lembaga.lisensiFitur || []).includes('kalender_plus');
+
     const today = new Date();
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth(); 
@@ -460,7 +477,6 @@ window.renderDashboardKalender = function() {
     const currentUser = window.currentUser || {};
     const isAdminOrKurikulum = currentUser.hakAkses === 'Super Admin' || currentUser.hakAkses === 'Administrator' || currentUser.hakAkses === 'Operator/TU' || (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('kurikulum'));
 
-    const lembaga = (window.appState && window.appState.lembaga && window.appState.lembaga.length > 0) ? window.appState.lembaga[0] : {};
     const liburConfig = lembaga.libur || 'Hanya Ahad';
     let liburIndices = [];
     if(liburConfig.toLowerCase().includes('ahad')) liburIndices.push(0);
@@ -494,13 +510,16 @@ window.renderDashboardKalender = function() {
         let hijriSiang = '';
         let hijriMalam = '';
         let hijriMatchStr = '';
-        try {
-            let numSiang = new Intl.DateTimeFormat('id-ID-u-ca-islamic-umalqura', { day: 'numeric' }).format(dateObj);
-            let numMalam = new Intl.DateTimeFormat('id-ID-u-ca-islamic-umalqura', { day: 'numeric' }).format(nextDateObj);
-            hijriSiang = window.toArabicNumeral(numSiang);
-            hijriMalam = window.toArabicNumeral(numMalam);
-            hijriMatchStr = new Intl.DateTimeFormat('id-ID-u-ca-islamic-umalqura', { day: 'numeric', month: 'numeric' }).format(dateObj);
-        } catch(e) {}
+        
+        if (isPremium) {
+            try {
+                let numSiang = new Intl.DateTimeFormat('id-ID-u-ca-islamic-umalqura', { day: 'numeric' }).format(dateObj);
+                let numMalam = new Intl.DateTimeFormat('id-ID-u-ca-islamic-umalqura', { day: 'numeric' }).format(nextDateObj);
+                hijriSiang = window.toArabicNumeral(numSiang);
+                hijriMalam = window.toArabicNumeral(numMalam);
+                hijriMatchStr = new Intl.DateTimeFormat('id-ID-u-ca-islamic-umalqura', { day: 'numeric', month: 'numeric' }).format(dateObj);
+            } catch(e) {}
+        }
 
         let isToday = dateStr === todayStr;
         let isHariLiburPekanan = liburIndices.includes(dateObj.getDay()); 
@@ -622,6 +641,10 @@ window.handleKalenderSubmit = async function(event) {
     submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Memproses...';
     submitBtn.disabled = true;
 
+    // --- CEK LISENSI MODULAR ---
+    const lembaga = window.appState.lembaga[0] || {};
+    const isPremium = (lembaga.lisensiFitur || []).includes('kalender_plus');
+
     const recordId = document.getElementById('kalender-id').value;
     const tglMulai = document.getElementById('kalender-mulai').value;
     
@@ -638,7 +661,8 @@ window.handleKalenderSubmit = async function(event) {
         tipeAgenda: document.getElementById('kalender-tipe').value,
         warnaBg: document.getElementById('kalender-warna-bg').value,
         warnaTeks: document.getElementById('kalender-warna-teks').value,
-        pengulangan: document.getElementById('kalender-pengulangan').value,
+        // GEMBOK MODULAR: PASTIKAN PENGULANGAN DIBATALKAN JIKA STANDAR
+        pengulangan: isPremium ? document.getElementById('kalender-pengulangan').value : 'Tidak Ada',
         masehiMatch: mMatch,
         hijriMatch: hMatch,
         updatedAt: new Date()
@@ -675,6 +699,10 @@ window.toggleModal = function(modalId) {
 };
 
 export function renderHalamanKalender(container) {
+    // --- CEK LISENSI MODULAR ---
+    const lembaga = window.appState.lembaga[0] || {};
+    const isPremium = (lembaga.lisensiFitur || []).includes('kalender_plus');
+
     container.innerHTML = `
         <style>
             /* CSS Khusus Mode Cetak PDF Bawaan Browser */
@@ -721,7 +749,7 @@ export function renderHalamanKalender(container) {
             </div>
         </div>
 
-        <!-- MODAL FORM AGENDA (Tidak Diubah) -->
+        <!-- MODAL FORM AGENDA -->
         <div id="modal-kalender" class="hidden fixed inset-0 bg-slate-900 bg-opacity-50 z-50 flex items-center justify-center backdrop-blur-sm">
             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 border-t-4 border-teal-500 transform transition-all">
                 <div class="flex justify-between items-center mb-4 border-b pb-3">
@@ -758,12 +786,15 @@ export function renderHalamanKalender(container) {
                             </select>
                         </div>
                         <div>
-                            <label class="text-sm font-bold text-slate-600 mb-1 block">Pengulangan</label>
-                            <select id="kalender-pengulangan" class="border-2 p-3 rounded-xl w-full focus:outline-teal-500 font-semibold text-purple-700">
+                            <label class="text-sm font-bold text-slate-600 mb-1 flex justify-between">Pengulangan ${!isPremium ? '<i class="fa-solid fa-lock text-slate-400" title="Eksklusif Kalender Plus"></i>' : ''}</label>
+                            <select id="kalender-pengulangan" class="border-2 p-3 rounded-xl w-full focus:outline-teal-500 font-semibold ${isPremium ? 'text-purple-700' : 'text-slate-400 bg-slate-100 cursor-not-allowed'}" ${!isPremium ? 'disabled' : ''}>
                                 <option value="Tidak Ada">Tidak Ada</option>
+                                ${isPremium ? `
                                 <option value="Tahunan (Masehi)">Tahunan (Masehi)</option>
                                 <option value="Tahunan (Hijriah)">Tahunan (Hijriah)</option>
+                                ` : ''}
                             </select>
+                            ${!isPremium ? `<p class="text-[9px] text-slate-400 mt-1">Hanya ada di Kalender Plus.</p>` : ''}
                         </div>
                     </div>
 
