@@ -1421,24 +1421,43 @@ window.simpanPresensiKelas = async function(event, mode) {
     const dateStr = window.getLocalISOString();
     const sessionUser = window.currentUser;
 
-    const telatMins = window.hitungKeterlambatan(mode === 'Reguler' ? 'Kelas' : 'Inval', jamTxt, lembaga);
-    if (telatMins > 0) {
-        alert(`Terdeteksi Keterlambatan: ${telatMins} Menit!\n\nSistem akan melanjutkan ke form absen siswa.`);
-        keterangan = `(Telat ${telatMins}M) ` + keterangan;
-    }
-
-    const data = {
-        idGuru: sessionUser.id, namaGuru: sessionUser.nama, tanggal: dateStr,
-        waktu: now.toLocaleTimeString('id-ID', { hour: '2-digit', minute:'2-digit' }),
-        tipe: mode === 'Reguler' ? 'Kelas' : 'Inval', status: mode, kelas: kelas, mapel: mapel, jamTxt: jamTxt, 
-        keterangan: keterangan, terlambat: telatMins, jabatan: `Guru (${kelas})`, createdAt: now.toISOString()
-    };
-
     try {
+        // FIX BUG: Validasi ketat ke Database untuk mencegah Inval Ganda
+        const { getDocs, query, collection, where, addDoc } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
+        const qCek = query(collection(db, "Absensi"), where("tanggal", "==", dateStr), where("kelas", "==", kelas), where("jamTxt", "==", jamTxt));
+        const snapCek = await getDocs(qCek);
+        
+        let sudahDiisi = false;
+        snapCek.forEach(d => {
+            let t = d.data().tipe;
+            if(t === 'Kelas' || t === 'Inval') sudahDiisi = true;
+        });
+
+        if (sudahDiisi) {
+            alert("⚠️ KELAS SUDAH TERISI!\nSesi kelas ini sudah direkam presensinya oleh guru asli atau guru pengganti lain.");
+            btn.innerHTML = oriHTML; btn.disabled = false; return;
+        }
+
+        const telatMins = window.hitungKeterlambatan(mode === 'Reguler' ? 'Kelas' : 'Inval', jamTxt, lembaga);
+        if (telatMins > 0) {
+            alert(`Terdeteksi Keterlambatan: ${telatMins} Menit!\n\nSistem akan melanjutkan ke form absen siswa.`);
+            keterangan = `(Telat ${telatMins}M) ` + keterangan;
+        }
+
+        const data = {
+            idGuru: sessionUser.id, namaGuru: sessionUser.nama, tanggal: dateStr,
+            waktu: now.toLocaleTimeString('id-ID', { hour: '2-digit', minute:'2-digit' }),
+            tipe: mode === 'Reguler' ? 'Kelas' : 'Inval', status: mode, kelas: kelas, mapel: mapel, jamTxt: jamTxt, 
+            keterangan: keterangan, terlambat: telatMins, jabatan: `Guru (${kelas})`, createdAt: now.toISOString()
+        };
+
         await addDoc(collection(db, "Absensi"), data);
         window.bukaModalAbsenSiswa(kelas, mapel, jamTxt, dateStr);
-    } catch(e) { alert("Gagal menyimpan presensi."); } 
-    finally { btn.innerHTML = oriHTML; btn.disabled = false; }
+    } catch(e) { 
+        alert("Gagal menyimpan presensi."); 
+    } finally { 
+        btn.innerHTML = oriHTML; btn.disabled = false; 
+    }
 };
 
 // ================= GABUNG JADWAL =================
