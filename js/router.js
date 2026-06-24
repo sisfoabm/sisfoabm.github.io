@@ -28,7 +28,7 @@ const MENU_ITEMS = [
     { id: 'lisensi', icon: 'fa-gem', label: 'Lisensi & Modul' }
 ];
 
-window.MENU_ITEMS_GLOBAL = MENU_ITEMS; 
+window.MENU_ITEMS_GLOBAL = MENU_ITEMS;
 
 // ==========================================
 // FUNGSI CEK LISENSI & TRIAL (GLOBAL)
@@ -113,7 +113,6 @@ window.renderSidebarMenu = function() {
     const wewenangMatrix = lembaga.wewenangMatrix || {};
 
     let allowedMenuIds = new Set();
-    // Administrator & SA otomatis mendapatkan semua menu
     if (isSA_Admin) {
         MENU_ITEMS.forEach(m => allowedMenuIds.add(m.id));
     } else {
@@ -126,11 +125,12 @@ window.renderSidebarMenu = function() {
         });
     }
 
-    if (!isSuperAdmin) allowedMenuIds.delete('lisensi'); // Lisensi murni 100% hanya SA
+    if (!isSuperAdmin) allowedMenuIds.delete('lisensi'); 
 
     const filteredMenus = MENU_ITEMS.filter(m => allowedMenuIds.has(m.id));
     const sidebar = document.getElementById('app-sidebar');
     
+    // Tentukan teks status lisensi
     const trialEnd = lembaga.masaUjiCobaAkhir || "";
     let statusLisensi = "Lisensi Standar";
     if (trialEnd) {
@@ -145,9 +145,9 @@ window.renderSidebarMenu = function() {
         sidebar.innerHTML = `
             <div class="p-4 border-b border-slate-200">
                 <div class="font-black text-xl text-primary">Portal Yayasan</div>
-                <div class="text-amber-600 mt-1 font-bold" style="font-family: 'Caveat', 'Comic Sans MS', cursive; font-size: 1.15rem; transform: rotate(-3deg); transform-origin: left center;">${statusLisensi}</div>
+                <div class="text-amber-600 mt-1 font-bold" style="font-family: 'Comic Sans MS', 'Caveat', cursive; font-size: 1.15rem; transform: rotate(-3deg); transform-origin: left center;">${statusLisensi}</div>
             </div>
-            <nav class="flex-1 p-3 space-y-2 overflow-y-auto custom-scrollbar">
+            <nav class="flex-1 p-3 space-y-2 overflow-y-auto custom-scrollbar pb-24">
                 ${filteredMenus.map(m => {
                     let lockIcon = '';
                     if (m.id === 'tugas' && !window.cekLisensi('tugas_pegawai')) lockIcon = '<i class="fa-solid fa-lock text-amber-500 ml-auto text-xs" title="Tersegel Premium"></i>';
@@ -157,6 +157,7 @@ window.renderSidebarMenu = function() {
                     let btnClass = window.currentPage === m.id ? 'bg-blue-50 text-blue-600 font-bold' : 'text-slate-600 hover:bg-blue-50 dark:hover:bg-slate-700';
                     let iClass = window.currentPage === m.id ? 'text-blue-500' : 'text-slate-400';
                     
+                    // Pewarnaan khusus untuk Tab Terakhir (Permintaan Anda)
                     if (m.id === 'lembaga') {
                         btnClass = window.currentPage === m.id ? 'bg-rose-100 text-rose-800 font-bold' : 'text-rose-800 bg-rose-50 hover:bg-rose-100 hover:text-rose-900';
                         iClass = window.currentPage === m.id ? 'text-rose-700' : 'text-rose-600';
