@@ -26,74 +26,123 @@ body { overflow: hidden; background-color: #f8fafc; transition: all 0.3s ease; }
 /* =======================================
    TEMA 3: MENGAMBANG (Glassmorphism Premium)
 ======================================= */
-/* Latar belakang gradasi pastel segar */
 .tema-3 { background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%) !important; }
 .tema-3 #app-root { padding: 1.5rem; gap: 1.5rem; display: flex !important; flex-direction: row !important; }
-
-/* Efek Kaca (Glass) pada Sidebar dan Header */
 .tema-3 #app-sidebar { 
     background: rgba(255, 255, 255, 0.85) !important; 
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-radius: 1.5rem; 
-    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.15); 
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-radius: 1.5rem; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.15); 
     border: 1px solid rgba(255, 255, 255, 0.6) !important; 
     height: calc(100vh - 3rem); 
 }
 .tema-3 #app-header { 
     background: rgba(255, 255, 255, 0.85) !important; 
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-radius: 1.5rem; 
-    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); 
-    margin-bottom: 1.5rem; 
-    border: 1px solid rgba(255, 255, 255, 0.6) !important; 
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-radius: 1.5rem; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); 
+    margin-bottom: 1.5rem; border: 1px solid rgba(255, 255, 255, 0.6) !important; 
 }
 .tema-3 #view-container { background: transparent !important; padding: 0 !important; border-radius: 1.5rem; }
-
-/* Tombol Menu Hover Effect */
-.tema-3 #app-sidebar nav button {
-    border-radius: 1rem !important;
-    margin-bottom: 0.5rem;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    border: 1px solid transparent;
-}
-.tema-3 #app-sidebar nav button:hover {
-    background: rgba(255, 255, 255, 0.9) !important;
-    transform: translateX(5px);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-    border-color: rgba(255, 255, 255, 1);
-}
-
-/* Tombol Menu Aktif (Menyala / Glow) */
-.tema-3 #app-sidebar nav button.bg-blue-50 {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-    color: #ffffff !important;
-    box-shadow: 0 10px 20px -3px rgba(118, 75, 162, 0.4);
-    transform: scale(1.02);
-    border: none !important;
-}
+.tema-3 #app-sidebar nav button { border-radius: 1rem !important; margin-bottom: 0.5rem; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 1px solid transparent; }
+.tema-3 #app-sidebar nav button:hover { background: rgba(255, 255, 255, 0.9) !important; transform: translateX(5px); box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-color: rgba(255, 255, 255, 1); }
+.tema-3 #app-sidebar nav button.bg-blue-50 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important; color: #ffffff !important; box-shadow: 0 10px 20px -3px rgba(118, 75, 162, 0.4); transform: scale(1.02); border: none !important; }
 .tema-3 #app-sidebar nav button.bg-blue-50 span { color: #ffffff !important; }
-
-/* Desain Ikon Berada dalam Kotak */
-.tema-3 #app-sidebar nav button i {
-    background: rgba(0, 0, 0, 0.05);
-    padding: 0.4rem;
-    border-radius: 0.5rem;
-    margin-right: 0.75rem !important;
-    transition: all 0.3s;
-    width: 32px !important;
-    text-align: center;
-}
-.tema-3 #app-sidebar nav button.bg-blue-50 i {
-    background: rgba(255, 255, 255, 0.25) !important;
-    color: #ffffff !important;
-}
+.tema-3 #app-sidebar nav button i { background: rgba(0, 0, 0, 0.05); padding: 0.4rem; border-radius: 0.5rem; margin-right: 0.75rem !important; transition: all 0.3s; width: 32px !important; text-align: center; }
+.tema-3 #app-sidebar nav button.bg-blue-50 i { background: rgba(255, 255, 255, 0.25) !important; color: #ffffff !important; }
 
 /* =======================================
-   TEMA 4: APLIKASI MOBILE (Navigasi Bawah di HP)
+   TEMA 4: WINDOWS 8 / METRO UI (DESKTOP)
 ======================================= */
-.tema-4 #app-root { display: flex !important; flex-direction: row !important; }
+.tema-4 { background-color: #000000 !important; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important; }
+.tema-4 #app-root { display: flex !important; flex-direction: row !important; background-color: #000000 !important; }
+
+/* Sidebar Area Windows 8 */
+.tema-4 #app-sidebar { background-color: #000000 !important; border-right: none !important; width: 340px !important; }
+.tema-4 #app-sidebar div.p-4 { color: #ffffff !important; border-bottom: none !important; padding-bottom: 0 !important; }
+.tema-4 #app-sidebar div.font-black.text-xl { font-weight: 300 !important; font-size: 2rem !important; letter-spacing: -1px !important; text-transform: lowercase !important; }
+.tema-4 #app-sidebar div.text-amber-600 { display: none !important; } /* Sembunyikan font tulisan tangan agar tidak merusak tema Metro */
+
+/* Grid Navigasi Kotak (Tiles) */
+.tema-4 #app-sidebar nav { 
+    display: grid !important; 
+    grid-template-columns: repeat(2, 1fr) !important; 
+    gap: 10px !important; 
+    padding: 1.5rem !important; 
+    align-content: start !important;
+}
+
+/* Struktur Mutlak Tombol Metro Tile */
+.tema-4 #app-sidebar nav button {
+    position: relative !important;
+    border-radius: 0 !important; 
+    display: flex !important; 
+    flex-direction: column !important; 
+    justify-content: flex-end !important; /* Dorong teks ke bawah */
+    align-items: flex-start !important;
+    height: 120px !important; 
+    padding: 12px !important; 
+    transition: transform 0.1s ease !important; 
+    border: none !important; 
+    box-shadow: none !important;
+    overflow: hidden !important;
+}
+.tema-4 #app-sidebar nav button:active { transform: scale(0.95) !important; } /* Efek tekan 3D layar sentuh khas WP */
+
+/* Ikon Raksasa di Tengah (Watermark style) */
+.tema-4 #app-sidebar nav button i:not(.fa-lock) { 
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    font-size: 3.5rem !important; 
+    color: white !important; 
+    opacity: 0.85 !important;
+    margin: 0 !important;
+    z-index: 1 !important;
+}
+
+/* Teks Menu di Kiri Bawah */
+.tema-4 #app-sidebar nav button span { 
+    color: white !important; 
+    font-weight: 400 !important; 
+    font-size: 0.85rem !important; 
+    text-align: left !important; 
+    width: 100% !important; 
+    z-index: 2 !important;
+    text-transform: lowercase !important;
+    letter-spacing: 0.5px !important;
+}
+
+/* Ikon Lock (Premium) di Kanan Atas */
+.tema-4 #app-sidebar nav button i.fa-lock { 
+    position: absolute !important;
+    top: 10px !important;
+    right: 10px !important;
+    font-size: 0.8rem !important; 
+    color: rgba(255,255,255,0.7) !important; 
+    z-index: 2 !important;
+    margin: 0 !important;
+}
+
+/* Palet Warna Asli Metro UI (Tiles) */
+.tema-4 #app-sidebar nav button:nth-child(8n+1) { background-color: #1ba1e2 !important; } /* Cyan */
+.tema-4 #app-sidebar nav button:nth-child(8n+2) { background-color: #a05000 !important; } /* Brown */
+.tema-4 #app-sidebar nav button:nth-child(8n+3) { background-color: #339933 !important; } /* Green */
+.tema-4 #app-sidebar nav button:nth-child(8n+4) { background-color: #e51400 !important; } /* Red */
+.tema-4 #app-sidebar nav button:nth-child(8n+5) { background-color: #f09609 !important; } /* Orange */
+.tema-4 #app-sidebar nav button:nth-child(8n+6) { background-color: #00aba9 !important; } /* Teal */
+.tema-4 #app-sidebar nav button:nth-child(8n+7) { background-color: #d80073 !important; } /* Pink */
+.tema-4 #app-sidebar nav button:nth-child(8n+8) { background-color: #a20025 !important; } /* Crimson */
+
+/* Tile Aktif (Terpilih) */
+.tema-4 #app-sidebar nav button.bg-blue-50 { 
+    outline: 4px solid #ffffff !important; 
+    outline-offset: -6px !important; 
+}
+
+/* Konten Area Desktop */
+.tema-4 #app-header { background-color: #000000 !important; border: none !important; }
+.tema-4 #app-header span { color: #ffffff !important; font-weight: 300 !important; }
+.tema-4 #view-container { background-color: #f8fafc !important; border-radius: 0 !important; margin: 0 !important; border-left: 4px solid #333 !important; }
 
 /* =======================================
    TEMA 5: TERBALIK (Sidebar Kanan)
@@ -101,115 +150,76 @@ body { overflow: hidden; background-color: #f8fafc; transition: all 0.3s ease; }
 .tema-5 #app-root { display: flex !important; flex-direction: row-reverse !important; }
 .tema-5 #app-sidebar { border-left: 1px solid #e2e8f0 !important; border-right: none !important; }
 
-
 /* =======================================
    RESPONSIVE DASAR MOBILE (ALL THEMES)
-   *WAJIB* BERADA DI PALING BAWAH AGAR TIDAK DITIMPA OLEH TEMA-TEMA DI ATAS
 ======================================= */
 @media (max-width: 768px) {
-    /* 1. Paksa Layout Root Vertikal untuk SEMUA Tema */
-    #app-root, .tema-1 #app-root, .tema-2 #app-root, .tema-3 #app-root, .tema-4 #app-root, .tema-5 #app-root { 
-        flex-direction: column !important; 
-        padding: 0 !important;
-        gap: 0 !important;
+    /* Gunakan dynamic viewport (dvh) agar kebal dari bug URL bar di Safari/Chrome Mobile */
+    html, body { height: 100dvh !important; overflow: hidden !important; }
+    #app-root { flex-direction: column !important; height: 100dvh !important; padding: 0 !important; }
+
+    /* Jadikan Navigation Bar (Sidebar) melayang di bawah layar HP */
+    #app-sidebar, .tema-1 #app-sidebar, .tema-2 #app-sidebar, .tema-3 #app-sidebar, .tema-5 #app-sidebar { 
+        position: fixed !important; bottom: 0 !important; left: 0 !important; width: 100% !important; 
+        height: auto !important; border: none !important; border-top: 1px solid #e2e8f0 !important; 
+        padding: 0 !important; display: block !important; background: #ffffff !important; z-index: 100 !important;
     }
 
-    /* Beri jarak bawah agar konten tidak tertutup oleh Menu Navigasi Bawah */
-    #app-root > .flex-1 {
-        padding-bottom: 70px !important; 
-    }
-    
-    /* 2. Format Dasar Sidebar untuk Layar HP (JADIKAN FIXED BOTTOM NAVIGATION) */
-    #app-sidebar, .tema-1 #app-sidebar, .tema-2 #app-sidebar, .tema-3 #app-sidebar, .tema-4 #app-sidebar, .tema-5 #app-sidebar { 
-        position: fixed !important;
-        bottom: 0 !important;
-        left: 0 !important;
-        width: 100% !important; 
-        height: auto !important; 
-        border: none !important; 
-        border-top: 1px solid #e2e8f0 !important; 
-        padding: 0 !important; 
-        border-radius: 0 !important;
-        box-shadow: 0 -4px 10px -2px rgba(0, 0, 0, 0.1) !important;
-        display: block !important; 
-        background: #ffffff !important;
-        z-index: 100 !important;
-        backdrop-filter: none !important; 
-    }
-    
-    /* Bersihkan Header Khusus Tema 3 di HP */
-    .tema-3 #app-header { border-radius: 0 !important; margin-bottom: 0 !important; border-bottom: 1px solid #e2e8f0 !important; box-shadow: none !important; }
-    
-    /* Reset Tema 4 karena sudah diseragamkan menjadi Fixed Bottom Nav untuk semua tema */
-    .tema-4 #app-root { justify-content: flex-start !important; }
-    .tema-4 #app-header { order: unset !important; }
-    .tema-4 #view-container { order: unset !important; }
-    .tema-4 #app-sidebar { order: unset !important; position: fixed !important; bottom: 0 !important; }
-
-    /* Perbaikan Sentuhan (Touch) Scroll Mulus di HP untuk SEMUA Tema */
-    #view-container {
-        -webkit-overflow-scrolling: touch !important; 
-        overflow-y: auto !important;
-        height: 100% !important;
-    }
-    
-    /* 3. Sembunyikan Logo Yayasan */
     #app-sidebar > div.p-4 { display: none !important; }
     
-    /* 4. Navigasi Geser Kiri-Kanan (Horizontal Swipe) */
     #app-sidebar nav { 
-        display: flex !important; 
-        flex-direction: row !important; 
-        flex-wrap: nowrap !important; 
-        overflow-x: auto !important; 
-        gap: 0.25rem !important; 
-        width: 100% !important; 
-        padding: 0.5rem !important; 
-        margin: 0 !important;
-        -webkit-overflow-scrolling: touch;
+        display: flex !important; flex-direction: row !important; overflow-x: auto !important; 
+        width: 100% !important; padding: 0.5rem !important; margin: 0 !important;
+        -webkit-overflow-scrolling: touch; scrollbar-width: none; 
     }
-    
-    #app-sidebar nav > button { margin-top: 0 !important; margin-bottom: 0 !important; }
     #app-sidebar nav::-webkit-scrollbar { display: none !important; }
-    #app-sidebar nav { -ms-overflow-style: none; scrollbar-width: none; }
-    
-    /* 5. Format Tombol Menu (Ikon Atas, Teks Bawah) */
-    #app-sidebar nav button, .tema-3 #app-sidebar nav button { 
-        display: flex !important;
-        flex-direction: column !important; 
-        justify-content: center !important; 
-        align-items: center !important; 
-        font-size: 0.6rem !important; 
-        padding: 0.5rem 0.25rem !important; 
-        min-width: 75px !important; 
-        width: 75px !important; 
-        flex-shrink: 0 !important;
-        border-radius: 0.5rem !important;
-        line-height: 1.2 !important;
-        white-space: normal !important;
-        background: transparent !important;
-        box-shadow: none !important;
-        transform: none !important;
-    }
 
-    /* Reset Ikon dan Warna Khusus Tema 3 saat mode HP */
-    .tema-3 #app-sidebar nav button i { background: transparent !important; padding: 0 !important; width: auto !important; margin: 0 0 4px 0 !important; }
-    .tema-3 #app-sidebar nav button.bg-blue-50 i { color: #2563eb !important; }
-    .tema-3 #app-sidebar nav button.bg-blue-50 span { color: #2563eb !important; }
-    
-    #app-sidebar nav button i { font-size: 1.25rem !important; margin: 0 0 4px 0 !important; width: auto !important; }
+    #app-sidebar nav button { 
+        display: flex !important; flex-direction: column !important; justify-content: center !important; 
+        align-items: center !important; font-size: 0.6rem !important; padding: 0.5rem 0.25rem !important; 
+        min-width: 75px !important; border-radius: 0.5rem !important; background: transparent !important; box-shadow: none !important;
+    }
+    #app-sidebar nav button i { font-size: 1.25rem !important; margin: 0 0 4px 0 !important; }
     #app-sidebar nav button span { display: block !important; text-align: center !important; width: 100% !important; }
     
-    /* Warna Aktif Standar HP */
     #app-sidebar nav button.bg-blue-50 { background: #eff6ff !important; color: #2563eb !important; border: none !important; }
     #app-sidebar nav button.bg-blue-50 i, #app-sidebar nav button.bg-blue-50 span { color: #2563eb !important; }
+
+    .tema-3 #app-sidebar nav button i { background: transparent !important; padding: 0 !important; width: auto !important; }
+    .tema-3 #app-sidebar nav button.bg-blue-50 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important; box-shadow: 0 4px 10px rgba(118, 75, 162, 0.3) !important; }
+    .tema-3 #app-sidebar nav button.bg-blue-50 i, .tema-3 #app-sidebar nav button.bg-blue-50 span { color: #ffffff !important; }
+    .tema-3 #app-header { border-radius: 0 !important; margin-bottom: 0 !important; border-bottom: 1px solid #e2e8f0 !important; box-shadow: none !important; }
+
+    /* =======================================
+       TEMA 4: WINDOWS PHONE (MOBILE)
+    ======================================= */
+    .tema-4 #app-sidebar { 
+        position: fixed !important; bottom: 0 !important; left: 0 !important; width: 100% !important; 
+        background: #000000 !important; border-top: none !important; z-index: 100 !important; 
+    }
     
-    /* Kembalikan khusus Tema 3 Aktif agar tetap terbaca dan elegan di HP */
-    .tema-3 #app-sidebar nav button.bg-blue-50 {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        box-shadow: 0 4px 10px rgba(118, 75, 162, 0.3) !important;
+    /* Deretan Kotak (Tiles) yang bisa digeser di HP */
+    .tema-4 #app-sidebar nav { 
+        display: flex !important; flex-direction: row !important; gap: 10px !important; 
+        padding: 12px !important; overflow-x: auto !important; scroll-snap-type: x mandatory;
     }
-    .tema-3 #app-sidebar nav button.bg-blue-50 i, .tema-3 #app-sidebar nav button.bg-blue-50 span {
-        color: #ffffff !important;
+    
+    .tema-4 #app-sidebar nav button { 
+        height: 100px !important; 
+        min-width: 100px !important; /* Kotak Persegi Sempurna */
+        scroll-snap-align: start;
     }
+
+    .tema-4 #app-sidebar nav button i:not(.fa-lock) { font-size: 2.5rem !important; }
+    .tema-4 #app-sidebar nav button span { font-size: 0.75rem !important; margin-top: auto !important;}
+
+    .tema-4 #app-header { background: #000000 !important; }
+    .tema-4 #view-container { border-left: none !important; border-radius: 0 !important; }
+
+    /* Ruang bawah ekstra agar konten tidak tertutup bar tile besar */
+    .tema-4 #app-root > .flex-1 { padding-bottom: 130px !important; }
+    
+    /* FIX UTAMA BUG SCROLL: Cukup beri padding bottom untuk ruang Nav, biarkan flexbox bekerja alami */
+    #app-root > .flex-1 { padding-bottom: 85px !important; }
+    #view-container { overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; height: auto !important; }
 }
