@@ -1,23 +1,8 @@
 /* =======================================
    PENGATURAN GLOBAL & SCROLL
 ======================================= */
-html, body { 
-    height: 100%; 
-    height: 100dvh; 
-    overflow: hidden !important; 
-    background-color: #f8fafc; 
-    transition: all 0.3s ease; 
-}
-
-#view-container { 
-    overflow-y: auto !important; 
-    overflow-x: hidden !important; 
-    -webkit-overflow-scrolling: touch !important; 
-    height: 100%; 
-    scroll-behavior: smooth; 
-    padding-bottom: 120px !important; 
-}
-
+body { overflow: hidden; background-color: #f8fafc; transition: all 0.3s ease; }
+#view-container { overflow-y: auto !important; height: 100%; scroll-behavior: smooth; padding-bottom: 2rem; }
 #app-sidebar { transition: all 0.3s ease; }
 
 /* =======================================
@@ -220,4 +205,19 @@ html, body {
     .tema-3 #app-sidebar nav button.bg-blue-50 i, .tema-3 #app-sidebar nav button.bg-blue-50 span {
         color: #ffffff !important;
     }
+}
+
+/* =======================================
+   PERBAIKAN SCROLL HP & VIEWPORT
+======================================= */
+#app-root {
+    height: 100dvh !important; /* Mencegah konten tertutup address bar HP */
+}
+
+#app-root > div.flex-1.flex-col {
+    min-height: 0 !important; /* WAJIB di Flexbox agar elemen anak (#view-container) bisa di-scroll */
+}
+
+#view-container {
+    -webkit-overflow-scrolling: touch !important; /* Mengaktifkan momentum scroll (licin) di iOS */
 }
