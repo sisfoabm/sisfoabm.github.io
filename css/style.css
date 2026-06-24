@@ -141,11 +141,18 @@ body { overflow: hidden; background-color: #f8fafc; transition: all 0.3s ease; }
     .tema-3 #app-header { border-radius: 0 !important; margin-bottom: 0 !important; border-bottom: 1px solid #e2e8f0 !important; box-shadow: none !important; }
     
     /* Reset Tema 4 karena sudah diseragamkan menjadi Fixed Bottom Nav untuk semua tema */
-    .tema-4 #app-root { justify-content: flex-start !important; height: auto !important; }
+    .tema-4 #app-root { justify-content: flex-start !important; }
     .tema-4 #app-header { order: unset !important; }
-    .tema-4 #view-container { order: unset !important; height: auto !important; padding-bottom: 0 !important; }
+    .tema-4 #view-container { order: unset !important; }
     .tema-4 #app-sidebar { order: unset !important; position: fixed !important; bottom: 0 !important; }
 
+    /* Perbaikan Sentuhan (Touch) Scroll Mulus di HP untuk SEMUA Tema */
+    #view-container {
+        -webkit-overflow-scrolling: touch !important; 
+        overflow-y: auto !important;
+        height: 100% !important;
+    }
+    
     /* 3. Sembunyikan Logo Yayasan */
     #app-sidebar > div.p-4 { display: none !important; }
     
@@ -205,19 +212,4 @@ body { overflow: hidden; background-color: #f8fafc; transition: all 0.3s ease; }
     .tema-3 #app-sidebar nav button.bg-blue-50 i, .tema-3 #app-sidebar nav button.bg-blue-50 span {
         color: #ffffff !important;
     }
-}
-
-/* =======================================
-   PERBAIKAN SCROLL HP & VIEWPORT
-======================================= */
-#app-root {
-    height: 100dvh !important; /* Mencegah konten tertutup address bar HP */
-}
-
-#app-root > div.flex-1.flex-col {
-    min-height: 0 !important; /* WAJIB di Flexbox agar elemen anak (#view-container) bisa di-scroll */
-}
-
-#view-container {
-    -webkit-overflow-scrolling: touch !important; /* Mengaktifkan momentum scroll (licin) di iOS */
 }
