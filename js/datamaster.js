@@ -198,15 +198,15 @@ export function renderHalamanLembaga(container) {
                         <input type="text" id="lem-tahfidz-istirahat" placeholder="Cth: 10:00-10:15, 12:00-12:30" class="border p-2 rounded w-full">
                     </div>
                     
-                    <div class="col-span-1 md:col-span-2 border p-4 rounded bg-orange-50 border-orange-200 relative">
-                        ${!hasPresensiPlus ? `<div class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center rounded"><span class="bg-amber-100 text-amber-700 px-4 py-2 rounded-lg font-black border border-amber-300 shadow-sm"><i class="fa-solid fa-lock mr-2"></i> Mode Disiplin Super Ketat (GPS) hanya tersedia di Lisensi Presensi Pro.</span></div>` : ''}
+                    <div class="col-span-1 md:col-span-2 border p-4 rounded bg-orange-50 border-orange-200">
+                        <label class="text-sm font-bold text-slate-700 block mb-1">Sistem Kedisiplinan Presensi Pegawai</label>
+                        ${!hasPresensiPlus ? `<p class="text-[10px] font-bold text-amber-600 mb-2"><i class="fa-solid fa-lock mr-1"></i> Opsi Super Ketat (GPS) tersegel. Buka via Lisensi Presensi Pro.</p>` : ''}
                         
-                        <label class="text-sm font-bold text-slate-700 block mb-2">Sistem Kedisiplinan Presensi Pegawai</label>
                         <select id="lem-disiplin" onchange="window.toggleDisiplinFields()" class="border p-2 rounded w-full focus:outline-primary mb-3 font-semibold text-orange-700" required>
                             <option value="">-- Pilih Tingkat Kedisiplinan --</option>
                             <option value="Longgar">1. Longgar (Absen Bebas, Input Telat Mandiri)</option>
                             <option value="Semi Ketat">2. Semi Ketat (Wajib Absen Sesuai Jam, Kalkulasi Telat Otomatis)</option>
-                            <option value="Super Ketat">3. Super Ketat (Sesuai Jam + Wajib Sesuai Koordinat GPS)</option>
+                            <option value="Super Ketat" ${!hasPresensiPlus ? 'disabled' : ''}>3. Super Ketat (Sesuai Jam + Wajib Sesuai Koordinat GPS) ${!hasPresensiPlus ? '🔒' : ''}</option>
                         </select>
 
                         <div id="field-toleransi" class="hidden mb-3">
@@ -1400,8 +1400,6 @@ window.simpanPresensiKelas = async function(event, mode) {
     if(!select || !select.value) return alert("Pilih jadwal kelas pada dropdown terlebih dahulu!");
     
     const lembaga = window.appState.lembaga[0] || {};
-    
-    // ATURAN BLOKIR JAM PULANG KELAS/LEMBAGA
     const now = new Date(); 
     const curMins = window.waktuKeMenit(now.toLocaleTimeString('id-ID', { hour: '2-digit', minute:'2-digit' }));
     let jamPulangMins = window.waktuKeMenit(lembaga.umumPulang || "15:00");
@@ -1416,23 +1414,30 @@ window.simpanPresensiKelas = async function(event, mode) {
     const oriHTML = btn.innerHTML;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memproses...'; btn.disabled = true;
 
-    const [idJadwal, kelas, mapel, jamTxt] = select.value.split('|');
+    // Memecah value dropdown yang telah disesuaikan
+    const valSplits = select.value.split('|');
+    const idJadwal = valSplits[0];
+    const kelas = valSplits[1];
+    const mapel = valSplits[2];
+    const jamTxt = valSplits[3];
+    const idGuruAsli = valSplits[4] || '';
+    const namaGuruAsli = valSplits[5] || '';
+    
     let keterangan = document.getElementById(inputKetId).value || '';
     const dateStr = window.getLocalISOString();
     const sessionUser = window.currentUser;
 
     try {
-        // FIX BUG: Validasi ketat ke Database untuk mencegah Inval Ganda
-        const { getDocs, query, collection, where, addDoc } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
+        const { getDocs, query, collection, where, addDoc, doc, updateDoc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
+        
+        // Cek apakah kelas di jam ini SUDAH DIISI absensinya oleh siapapun
         const qCek = query(collection(db, "Absensi"), where("tanggal", "==", dateStr), where("kelas", "==", kelas), where("jamTxt", "==", jamTxt));
         const snapCek = await getDocs(qCek);
-        
         let sudahDiisi = false;
         snapCek.forEach(d => {
             let t = d.data().tipe;
             if(t === 'Kelas' || t === 'Inval') sudahDiisi = true;
         });
-
         if (sudahDiisi) {
             alert("⚠️ KELAS SUDAH TERISI!\nSesi kelas ini sudah direkam presensinya oleh guru asli atau guru pengganti lain.");
             btn.innerHTML = oriHTML; btn.disabled = false; return;
@@ -1440,24 +1445,75 @@ window.simpanPresensiKelas = async function(event, mode) {
 
         const telatMins = window.hitungKeterlambatan(mode === 'Reguler' ? 'Kelas' : 'Inval', jamTxt, lembaga);
         if (telatMins > 0) {
-            alert(`Terdeteksi Keterlambatan: ${telatMins} Menit!\n\nSistem akan melanjutkan ke form absen siswa.`);
             keterangan = `(Telat ${telatMins}M) ` + keterangan;
         }
 
-        const data = {
-            idGuru: sessionUser.id, namaGuru: sessionUser.nama, tanggal: dateStr,
-            waktu: now.toLocaleTimeString('id-ID', { hour: '2-digit', minute:'2-digit' }),
-            tipe: mode === 'Reguler' ? 'Kelas' : 'Inval', status: mode, kelas: kelas, mapel: mapel, jamTxt: jamTxt, 
-            keterangan: keterangan, terlambat: telatMins, jabatan: `Guru (${kelas})`, createdAt: now.toISOString()
-        };
+        if (mode === 'Inval') {
+            // Cek apakah sudah ada pengajuan pending
+            const qPending = query(collection(db, "PengajuanInval"), where("tanggal", "==", dateStr), where("kelas", "==", kelas), where("jamTxt", "==", jamTxt), where("status", "==", "Pending"));
+            const snapPending = await getDocs(qPending);
+            if (!snapPending.empty) {
+                alert("Pengajuan inval untuk sesi kelas ini sudah dikirim dan sedang menunggu persetujuan.");
+                btn.innerHTML = oriHTML; btn.disabled = false; return;
+            }
 
-        await addDoc(collection(db, "Absensi"), data);
-        window.bukaModalAbsenSiswa(kelas, mapel, jamTxt, dateStr);
+            await addDoc(collection(db, "PengajuanInval"), {
+                pengajuId: sessionUser.id, pengajuNama: sessionUser.nama,
+                idGuruAsli: idGuruAsli, namaGuruAsli: namaGuruAsli,
+                kelas: kelas, mapel: mapel, jamTxt: jamTxt, tanggal: dateStr,
+                waktu: now.toLocaleTimeString('id-ID', { hour: '2-digit', minute:'2-digit' }),
+                keterangan: keterangan, terlambat: telatMins, status: "Pending", createdAt: now.toISOString()
+            });
+            
+            alert("Pengajuan Inval berhasil dikirim!\nSilakan tunggu persetujuan dari Guru Asli, Operator/TU, atau Administrator. Jika sudah disetujui, Anda dapat mengisi Absen Siswa melalui Tabel Histori di bawah.");
+            window.navigate('absensi');
+        } else {
+            if (telatMins > 0) alert(`Terdeteksi Keterlambatan: ${telatMins} Menit!\n\nSistem akan melanjutkan ke form absen siswa.`);
+            await addDoc(collection(db, "Absensi"), {
+                idGuru: sessionUser.id, namaGuru: sessionUser.nama, tanggal: dateStr,
+                waktu: now.toLocaleTimeString('id-ID', { hour: '2-digit', minute:'2-digit' }),
+                tipe: 'Kelas', status: 'Reguler', kelas: kelas, mapel: mapel, jamTxt: jamTxt, 
+                keterangan: keterangan, terlambat: telatMins, jabatan: `Guru (${kelas})`, createdAt: now.toISOString()
+            });
+            window.bukaModalAbsenSiswa(kelas, mapel, jamTxt, dateStr);
+        }
     } catch(e) { 
-        alert("Gagal menyimpan presensi."); 
+        alert("Gagal memproses presensi."); 
     } finally { 
         btn.innerHTML = oriHTML; btn.disabled = false; 
     }
+};
+
+// Fungsi Eksekusi Persetujuan Inval
+window.setujuiInval = async function(idInval) {
+    if(!confirm("Setujui pengajuan inval ini? Guru pengganti akan otomatis terekam hadir.")) return;
+    try {
+        const { doc, getDoc, updateDoc, collection, addDoc } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
+        const snap = await getDoc(doc(db, "PengajuanInval", idInval));
+        if(!snap.exists()) return;
+        const data = snap.data();
+        
+        await addDoc(collection(db, "Absensi"), {
+            idGuru: data.pengajuId, namaGuru: data.pengajuNama, tanggal: data.tanggal,
+            waktu: data.waktu, tipe: 'Inval', status: 'Inval',
+            kelas: data.kelas, mapel: data.mapel, jamTxt: data.jamTxt,
+            keterangan: data.keterangan || 'Inval Disetujui', terlambat: data.terlambat || 0,
+            jabatan: `Guru (${data.kelas})`, createdAt: new Date().toISOString()
+        });
+        
+        await updateDoc(doc(db, "PengajuanInval", idInval), { status: "Disetujui", approvedBy: window.currentUser.nama });
+        alert("Inval disetujui! Guru pengganti sekarang bisa mengisi absen siswa di menu Histori.");
+        window.navigate('absensi');
+    } catch(e) { alert("Gagal menyetujui."); }
+};
+
+window.tolakInval = async function(idInval) {
+    if(!confirm("Tolak pengajuan inval ini?")) return;
+    try {
+        const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
+        await updateDoc(doc(db, "PengajuanInval", idInval), { status: "Ditolak", rejectedBy: window.currentUser.nama });
+        window.navigate('absensi');
+    } catch(e) { alert("Gagal menolak."); }
 };
 
 // ================= GABUNG JADWAL =================
@@ -1477,69 +1533,6 @@ function mergeJadwal(jadwalArray) {
     merged.push(current);
     return merged;
 }
-
-// ================= RE-RENDER TABEL HISTORI SAJA (FILTER) =================
-window.filterTabelHistori = function() {
-    const tglMulai = document.getElementById('filter-hist-start').value;
-    const tglSampai = document.getElementById('filter-hist-end').value;
-    const bodyTabel = document.getElementById('tbody-histori');
-    
-    if(!tglMulai || !tglSampai) return alert("Pilih tanggal rentang awal dan akhir!");
-
-    let filtered = window.rawHistoriSaya.filter(h => h.tanggal >= tglMulai && h.tanggal <= tglSampai);
-    filtered.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-
-    let displayRows = [];
-    let processedCICO = new Set();
-
-    filtered.forEach(h => {
-        if (h.tipe === 'CICO') {
-            const key = `${h.tanggal}_${h.jabatan}`;
-            if (processedCICO.has(key)) return;
-            processedCICO.add(key);
-            
-            const cicos = filtered.filter(x => x.tipe === 'CICO' && x.tanggal === h.tanggal && x.jabatan === h.jabatan);
-            const cin = cicos.find(x => x.status === 'Cek In');
-            const cout = cicos.find(x => x.status === 'Cek Out');
-            
-            displayRows.push({
-                tanggal: h.tanggal, jabatan: h.jabatan || 'Pegawai',
-                waktu: `<span class="text-emerald-600 font-bold block mb-1">IN: <span class="text-slate-700">${cin ? cin.waktu : '-'}</span></span> <span class="text-rose-600 font-bold block">OUT: <span class="text-slate-700">${cout ? cout.waktu : '-'}</span></span>`,
-                keterangan: `<span class="italic text-slate-400">${cin?.keterangan || 'Tidak ada catatan'}</span>`
-            });
-        } else if (h.tipe === '1x') {
-            displayRows.push({
-                tanggal: h.tanggal, jabatan: h.jabatan || 'Pegawai',
-                waktu: `<span class="bg-blue-100 text-blue-700 px-2 py-1 rounded font-black whitespace-nowrap">Pkl ${h.waktu}</span>`,
-                keterangan: `<span class="italic text-slate-400">${h.keterangan || 'Hadir Harian'}</span>`
-            });
-        } else if (h.tipe === 'Kelas' || h.tipe === 'Inval') {
-            const as = window.rawHistoriSiswa.find(s => s.tanggal === h.tanggal && s.kelas === h.kelas && s.jamTxt === h.jamTxt);
-            let jmlHadirText = `<button type="button" onclick="window.bukaModalAbsenSiswa('${h.kelas}', '${h.mapel}', '${h.jamTxt}', '${h.tanggal}')" class="mt-1 text-white font-bold bg-rose-500 hover:bg-rose-600 px-2 py-1 rounded shadow-sm transition text-[10px] cursor-pointer"><i class="fa-solid fa-hand-pointer mr-1"></i> Klik Absen Siswa</button>`;
-            if (as && as.detailSiswa) {
-                const jmlHadir = as.detailSiswa.filter(ds => ds.status === 'Hadir').length;
-                jmlHadirText = `<button type="button" onclick="window.bukaModalAbsenSiswa('${h.kelas}', '${h.mapel}', '${h.jamTxt}', '${h.tanggal}')" class="mt-1 text-emerald-700 font-black bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 px-2 py-0.5 rounded shadow-sm transition cursor-pointer" title="Klik untuk edit"><i class="fa-solid fa-pen-to-square mr-1"></i> ${jmlHadir} Anak Hadir</button>`;
-            }
-            
-            displayRows.push({
-                tanggal: h.tanggal,
-                jabatan: `<span class="font-bold text-slate-800">Guru (${h.kelas})</span> ${h.status==='Inval'?'<span class="text-[9px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded ml-1 uppercase font-black">INVAL</span>':''}`,
-                waktu: `<span class="font-bold text-slate-700 whitespace-nowrap">Pkl ${h.waktu}</span> <br> <span class="text-[10px] text-indigo-500 font-bold bg-indigo-50 px-1 rounded mt-1 inline-block">${h.jamTxt}</span>`,
-                keterangan: `<span class="font-black text-slate-700 block mb-0.5">${h.mapel}</span> <span class="text-xs text-slate-500 italic block mb-1">${h.keterangan || '-'}</span> ${jmlHadirText}`
-            });
-        }
-    });
-
-    bodyTabel.innerHTML = displayRows.map((r, idx) => `
-        <tr class="border-b hover:bg-slate-50 text-sm transition">
-            <td class="p-3 text-center font-medium">${idx + 1}</td>
-            <td class="p-3 font-bold text-slate-700 whitespace-nowrap">${r.tanggal}</td>
-            <td class="p-3 leading-tight">${r.jabatan}</td>
-            <td class="p-3 leading-tight">${r.waktu}</td>
-            <td class="p-3 leading-tight">${r.keterangan}</td>
-        </tr>
-    `).join('') || '<tr><td colspan="5" class="p-6 text-center text-slate-400 font-medium">Tidak ada histori di rentang tanggal tersebut.</td></tr>';
-};
 
 // ================= MODAL ARSIP PRESENSI (TU/ADMIN) =================
 window.bukaModalArsip = async function() {
@@ -1649,6 +1642,13 @@ window.filterTabelHistori = function() {
                 waktu: `<span class="${badgeTipe} px-2 py-1 rounded font-black whitespace-nowrap">Pkl ${h.waktu}</span>`,
                 keterangan: `<span class="italic text-slate-400">${h.keterangan || 'Hadir'}</span> <span class="text-[9px] bg-slate-200 text-slate-600 px-1.5 rounded ml-1 font-bold">${h.tipe}</span>`
             });
+        } else if (h.tipe === 'Pending Inval') {
+            displayRows.push({
+                tanggal: h.tanggal,
+                jabatan: `<span class="font-bold text-slate-800">Guru (${h.kelas})</span> <span class="text-[9px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded ml-1 uppercase font-black" title="Menunggu Persetujuan">PENDING INVAL</span>`,
+                waktu: `<span class="font-bold text-slate-700 whitespace-nowrap">Pkl ${h.waktu}</span> <br> <span class="text-[10px] text-indigo-500 font-bold bg-indigo-50 px-1 rounded mt-1 inline-block">${h.jamTxt}</span>`,
+                keterangan: `<span class="font-black text-slate-700 block mb-0.5">${h.mapel}</span> <span class="text-xs text-amber-500 font-bold italic block mb-1"><i class="fa-solid fa-hourglass-half mr-1"></i> Menunggu Persetujuan dari ${h.namaGuruAsli || 'Guru Asli'}...</span>`
+            });
         } else if (h.tipe === 'Kelas' || h.tipe === 'Inval') {
             const as = window.rawHistoriSiswa.find(s => s.tanggal === h.tanggal && s.kelas === h.kelas && s.jamTxt === h.jamTxt);
             let jmlHadirText = `<button type="button" onclick="window.bukaModalAbsenSiswa('${h.kelas}', '${h.mapel}', '${h.jamTxt}', '${h.tanggal}')" class="mt-1 text-white font-bold bg-rose-500 hover:bg-rose-600 px-2 py-1 rounded shadow-sm transition text-[10px] cursor-pointer"><i class="fa-solid fa-hand-pointer mr-1"></i> Klik Absen Siswa</button>`;
@@ -1687,8 +1687,10 @@ export async function renderHalamanAbsensi(container) {
     const sessionUser = window.currentUser || {};
     const detailJabs = (window.appState.pegawai.find(p => p.id === sessionUser.id) || sessionUser).detailJabatan || [];
     
-    // --- CEK LISENSI MODULAR ---
+    // --- CEK LISENSI MODULAR & HAK AKSES ---
     const hasPresensiPlus = window.cekLisensi('presensi_plus');
+    const isSA_Admin = ['Super Admin', 'Administrator'].includes(sessionUser.hakAkses);
+    const isOpTU = sessionUser.hakAkses === 'Operator/TU';
     
     const jabatan1x = detailJabs.filter(d => d.tipePresensi === '1x');
     const jabatanLain = detailJabs.filter(d => d.tipePresensi !== '1x');
@@ -1719,7 +1721,6 @@ export async function renderHalamanAbsensi(container) {
     let isTanggalMerah = false;
     let namaLibur = '';
     
-    // --- GEMBOK MODULAR: HANYA PLUS YANG DETEKSI TANGGAL MERAH KALENDER ---
     if (hasPresensiPlus) {
         (window.appState.kalender || []).forEach(agenda => {
             if(agenda.tipeAgenda === 'Libur') {
@@ -1736,6 +1737,7 @@ export async function renderHalamanAbsensi(container) {
 
     let todayAbsensi = []; window.rawHistoriSaya = []; window.rawHistoriSiswa = [];
     let activeRapatList = []; 
+    let pendingInvalList = [];
 
     try {
         const { db } = await import('./firebase-init.js');
@@ -1750,10 +1752,21 @@ export async function renderHalamanAbsensi(container) {
         const snapSiswa = await getDocs(query(collection(db, "AbsensiSiswa"), where("idGuru", "==", sessionUser.id)));
         snapSiswa.forEach(doc => window.rawHistoriSiswa.push(doc.data()));
 
-        // --- GEMBOK MODULAR: TARIK DATA RAPAT JIKA PRESENSI PLUS ---
         if (hasPresensiPlus) {
             const snapRapat = await getDocs(query(collection(db, "Rapat"), where("status", "==", "Aktif")));
             snapRapat.forEach(doc => activeRapatList.push({ id: doc.id, ...doc.data() }));
+
+            // TAMPILKAN PENGAJUAN INVAL JIKA USER ADALAH ADMIN/TU ATAU GURU ASLI, DAN TAMBAHKAN KE HISTORI PENGAJU
+            const snapInval = await getDocs(query(collection(db, "PengajuanInval"), where("status", "==", "Pending")));
+            snapInval.forEach(doc => {
+                const d = doc.data();
+                if (d.tanggal === todayISO && (isSA_Admin || isOpTU || d.idGuruAsli === sessionUser.id)) {
+                    pendingInvalList.push({ id: doc.id, ...d });
+                }
+                if (d.pengajuId === sessionUser.id) {
+                    window.rawHistoriSaya.push({ id: doc.id, tipe: 'Pending Inval', ...d });
+                }
+            });
         }
     } catch(e) { console.error("Gagal sinkron absen", e); }
 
@@ -1779,19 +1792,18 @@ export async function renderHalamanAbsensi(container) {
     let jadwalLainRaw = (window.appState.jadwal || []).filter(j => j.idGuru !== sessionUser.id && j.hari === hariIniStr).sort((a,b) => a.jamKe - b.jamKe);
     let dropdownInvalHTML = mergeJadwal(jadwalLainRaw).filter(j => !isKelasTerisi(j.kelas, j.mapel, `${j.jamMulai}-${j.jamSelesai}`) && isValidTime(j.jamMulai, j.jamSelesai)).map(j => {
         let jamTxt = j.jamMulai === j.jamSelesai ? `Jam ${j.jamMulai}` : `Jam ${j.jamMulai}-${j.jamSelesai}`;
-        return `<option value="${j.id}|${j.kelas}|${j.mapel}|${jamTxt}">${jamTxt}: ${j.kelas} (${j.mapel}) - Milik ${j.namaGuru}</option>`;
+        return `<option value="${j.id}|${j.kelas}|${j.mapel}|${jamTxt}|${j.idGuru}|${j.namaGuru}">${jamTxt}: ${j.kelas} (${j.mapel}) - Milik ${j.namaGuru}</option>`;
     }).join('');
     if(!dropdownInvalHTML) dropdownInvalHTML = '<option value="">(Tidak ada kelas kosong di jam ini)</option>';
 
     let rapatHTML = '';
     let btnBukaRapat = '';
 
-    // --- GEMBOK MODULAR: TAMPILKAN UI RAPAT HANYA JIKA PRESENSI PLUS ---
     if (hasPresensiPlus) {
         if (activeRapatList.length > 0) {
             rapatHTML = activeRapatList.map(r => {
                 const formatterRp = new Intl.NumberFormat('id-ID');
-                const isAdminAtauKepala = ['Super Admin', 'Administrator', 'Operator/TU'].includes(sessionUser.hakAkses) || (sessionUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('kepala'));
+                const isAdminAtauKepala = isSA_Admin || isOpTU || (sessionUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('kepala'));
 
                 let isMulai = true; let jadwalText = '';
                 if (r.tanggalMulai && r.waktuMulai) {
@@ -1850,9 +1862,27 @@ export async function renderHalamanAbsensi(container) {
             }).join('');
         }
 
-        if (['Super Admin', 'Administrator', 'Operator/TU'].includes(sessionUser.hakAkses) || (sessionUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('kepala'))) {
+        if (isSA_Admin || isOpTU || (sessionUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('kepala'))) {
             btnBukaRapat = `<button onclick="window.bukaModalRapat()" class="bg-purple-100 hover:bg-purple-600 text-purple-700 hover:text-white font-bold px-4 py-2 rounded-xl text-sm shadow-sm transition ml-2 flex items-center"><i class="fa-solid fa-users-viewfinder md:mr-2"></i> <span class="hidden md:inline">Buat Rapat</span></button>`;
         }
+    }
+
+    let invalApprovalHTML = '';
+    if (pendingInvalList.length > 0) {
+        invalApprovalHTML = pendingInvalList.map(inv => `
+            <div class="bg-gradient-to-r from-orange-50 to-amber-50 border-l-4 border-orange-500 p-4 rounded-xl shadow-sm mb-4 flex flex-col md:flex-row justify-between items-center gap-4 animate-slide-up">
+                <div>
+                    <span class="bg-orange-500 text-white px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider mb-2 inline-block"><i class="fa-solid fa-handshake-angle mr-1"></i> Persetujuan Inval</span>
+                    <h4 class="font-black text-slate-800 text-lg">${inv.pengajuNama} <span class="text-[10px] bg-slate-200 text-slate-500 px-1 rounded mx-1">menggantikan</span> ${inv.namaGuruAsli || 'Guru Asli'}</h4>
+                    <p class="text-xs font-bold text-slate-600 mt-1"><i class="fa-solid fa-chalkboard-user text-indigo-500 mr-1"></i> Kelas ${inv.kelas} | ${inv.mapel} | ${inv.jamTxt}</p>
+                    <p class="text-[10px] text-slate-500 italic mt-1 font-medium">Alasan Pengganti: ${inv.keterangan || '-'}</p>
+                </div>
+                <div class="flex gap-2 w-full md:w-auto">
+                    <button onclick="window.tolakInval('${inv.id}')" class="flex-1 md:flex-none bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 px-4 py-2 rounded-xl font-bold text-xs transition shadow-sm">Tolak</button>
+                    <button onclick="window.setujuiInval('${inv.id}')" class="flex-1 md:flex-none bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2 rounded-xl font-black text-xs transition shadow-md"><i class="fa-solid fa-check mr-1"></i> Setujui Inval</button>
+                </div>
+            </div>
+        `).join('');
     }
 
     container.innerHTML = `
@@ -1867,6 +1897,8 @@ export async function renderHalamanAbsensi(container) {
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="lg:col-span-2">
+                ${invalApprovalHTML}
+
                 <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg border border-slate-100">
                     <div class="flex justify-between items-center mb-6 border-b pb-4">
                         <div class="flex items-center">
@@ -1874,7 +1906,7 @@ export async function renderHalamanAbsensi(container) {
                             <h3 class="font-black text-2xl text-slate-800">Panel Presensi Anda</h3>
                         </div>
                         <div class="flex items-center">
-                            ${['Operator/TU', 'Administrator', 'Super Admin'].includes(sessionUser.hakAkses) ? `<button onclick="window.bukaModalArsip()" id="btn-buka-arsip" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-sm shadow-sm transition flex items-center"><i class="fa-solid fa-box-archive md:mr-2"></i> <span class="hidden md:inline">Arsip</span></button>` : ''}
+                            ${isSA_Admin || isOpTU ? `<button onclick="window.bukaModalArsip()" id="btn-buka-arsip" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-sm shadow-sm transition flex items-center"><i class="fa-solid fa-box-archive md:mr-2"></i> <span class="hidden md:inline">Arsip</span></button>` : ''}
                             ${btnBukaRapat}
                         </div>
                     </div>
@@ -1968,11 +2000,11 @@ export async function renderHalamanAbsensi(container) {
                 ${!(isLiburPekanan || isTanggalMerah) ? `
                 <div class="bg-white rounded-2xl shadow-lg border border-slate-100 mt-6 overflow-hidden">
                     <button onclick="document.getElementById('form-inval-container').classList.toggle('hidden')" class="w-full flex justify-between items-center bg-orange-50 hover:bg-orange-100 p-6 transition">
-                        <span class="font-black text-xl text-orange-600"><i class="fa-solid fa-people-arrows mr-2"></i> Gantikan Guru Lain (Inval)</span>
+                        <span class="font-black text-xl text-orange-600"><i class="fa-solid fa-people-arrows mr-2"></i> Ajukan Inval (Gantikan Guru Lain)</span>
                         <i class="fa-solid fa-chevron-down text-orange-600 text-xl"></i>
                     </button>
                     <div id="form-inval-container" class="hidden p-6 pt-2 space-y-4 bg-white">
-                        <p class="text-xs font-bold text-slate-500 mb-4 border-b pb-4">Fitur ini dapat digunakan oleh semua jabatan untuk membackup jam kelas yang kosong.</p>
+                        <p class="text-[11px] font-bold text-orange-700 bg-orange-100 p-3 rounded-lg mb-4 border border-orange-200"><i class="fa-solid fa-info-circle mr-1"></i> Pengajuan Inval memerlukan persetujuan dari Guru Asli, Operator/TU, atau Administrator sebelum direkam ke Histori.</p>
                         <form onsubmit="window.simpanPresensiKelas(event, 'Inval')" class="space-y-4">
                             <div>
                                 <label class="text-xs font-bold text-slate-600 block mb-1">Pilih Kelas Kosong Hari Ini:</label>
@@ -1986,7 +2018,7 @@ export async function renderHalamanAbsensi(container) {
                                 <input type="text" id="presensi-inval-keterangan" placeholder="Contoh: Menggantikan karena sakit..." class="w-full p-3 border-2 border-slate-200 rounded-xl font-medium text-slate-700 bg-white focus:outline-orange-500">
                             </div>
                             <button type="submit" class="w-full bg-gradient-to-r from-orange-400 to-orange-500 hover:from-orange-500 hover:to-orange-600 text-white font-black py-4 rounded-xl shadow-lg transform hover:-translate-y-1 transition text-lg mt-2">
-                                <i class="fa-solid fa-handshake-angle mr-2"></i> KONFIRMASI INVAL & ABSEN SISWA
+                                <i class="fa-solid fa-paper-plane mr-2"></i> AJUKAN PERSETUJUAN INVAL
                             </button>
                         </form>
                     </div>
