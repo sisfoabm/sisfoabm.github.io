@@ -110,6 +110,8 @@ function generateGridHTML(kelasTarget, timeSlots, hariKerja, isLiburFunc, jadwal
         }
     });
 
+    gridHTML += `</div>`;
+
     // Kalkulasi Total JP Per Mapel
     const jpMapel = {};
     jadwalSemua.filter(j => j.kelas === kelasTarget).forEach(j => {
@@ -117,17 +119,43 @@ function generateGridHTML(kelasTarget, timeSlots, hariKerja, isLiburFunc, jadwal
         jpMapel[j.mapel]++;
     });
     
-    let legendJP = `<div class="mt-6 pt-4 border-t border-slate-200"><h4 class="font-bold text-sm text-slate-600 mb-3"><i class="fa-solid fa-chart-bar mr-2"></i> Rekapitulasi Jam Pelajaran (JP)</h4><div class="flex flex-wrap gap-2">`;
-    if (Object.keys(jpMapel).length === 0) {
-        legendJP += `<span class="text-xs text-slate-400 italic">Belum ada jadwal terisi untuk kelas ini.</span>`;
-    } else {
-        for (let m in jpMapel) {
-            legendJP += `<div class="bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg flex items-center shadow-sm"><span class="text-[11px] font-bold text-slate-700 mr-3">${m}</span><span class="bg-indigo-600 text-white text-[10px] px-2 py-1 rounded font-black">${jpMapel[m]} JP</span></div>`;
-        }
-    }
-    legendJP += `</div></div>`;
+    let legendJP = `<div class="mt-6 pt-4 border-t border-slate-200"><h4 class="font-bold text-sm text-slate-600 mb-3"><i class="fa-solid fa-chart-bar mr-2"></i> Rekapitulasi Jam Pelajaran (JP)</h4>`;
     
-    gridHTML += legendJP + `</div></div>`;
+    if (Object.keys(jpMapel).length === 0) {
+        legendJP += `<div class="p-4 bg-slate-50 text-center text-xs font-bold text-slate-400 italic rounded-xl border border-slate-200">Belum ada jadwal terisi untuk kelas ini.</div>`;
+    } else {
+        let tbodyStr = '';
+        let no = 1;
+        for (let m in jpMapel) {
+            tbodyStr += `
+            <tr class="border-b border-slate-100 hover:bg-slate-50 transition">
+                <td class="p-2 text-center text-xs text-slate-500 font-bold border-r border-slate-100">${no++}</td>
+                <td class="p-2 text-xs font-bold text-slate-700">${m}</td>
+                <td class="p-2 text-center border-l border-slate-100"><span class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-black">${jpMapel[m]} JP</span></td>
+            </tr>`;
+        }
+        legendJP += `
+        <div class="overflow-x-auto border border-slate-200 rounded-xl shadow-sm">
+            <table class="w-full text-left bg-white">
+                <thead class="bg-slate-100 text-slate-600 border-b-2 border-slate-200">
+                    <tr>
+                        <th class="p-2 text-center text-[10px] uppercase font-black w-12 border-r border-slate-200">No</th>
+                        <th class="p-2 text-[10px] uppercase font-black">Mata Pelajaran</th>
+                        <th class="p-2 text-center text-[10px] uppercase font-black w-24 border-l border-slate-200">Total JP</th>
+                    </tr>
+                </thead>
+                <tbody>${tbodyStr}</tbody>
+            </table>
+        </div>`;
+    }
+    // Menutup div pembungkus legendJP
+    legendJP += `</div>`;
+    
+    gridHTML += legendJP;
+    
+    // Menutup div pembungkus utama card (.min-w-[900px])
+    gridHTML += `</div>`;
+    
     return gridHTML;
 }
 
