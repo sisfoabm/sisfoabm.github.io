@@ -51,23 +51,26 @@ export async function renderHalamanRaport(container) {
     const currentUser = window.currentUser || {};
     const isSA_Admin = ['Super Admin', 'Administrator'].includes(currentUser.hakAkses);
     const isTU = currentUser.hakAkses === 'Operator/TU';
-    const isWaliKelas = (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('wali kelas'));
+    const isWaliKelas = (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('wali kelas')) || currentUser.waliKelas;
     const isGuru = (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('guru'));
     const isMusyrif = (currentUser.detailJabatan || []).some(j => j.namaJabatan.toLowerCase().includes('pengasuh') || j.namaJabatan.toLowerCase().includes('musyrif') || j.namaJabatan.toLowerCase().includes('tahfidz'));
 
+    const canDasborWali = isWaliKelas || isSA_Admin; // Akses Dasbor Khusus
     const canInputMapel = isGuru || isSA_Admin || isTU;
     const canInputTahfidz = isMusyrif || isSA_Admin || isTU;
     const canPreview = isWaliKelas || isSA_Admin || isTU;
-    const canArsip = isSA_Admin || isTU; // Tampilkan selalu, kita gembok isi halamannya
+    const canArsip = isSA_Admin || isTU; 
 
-    if (!['input_mapel','input_tahfidz','preview','arsip'].includes(window.currentRaportTab)) {
-        if (canInputMapel) window.currentRaportTab = 'input_mapel';
+    if (!['dasbor_wali','input_mapel','input_tahfidz','preview','arsip'].includes(window.currentRaportTab)) {
+        if (canDasborWali) window.currentRaportTab = 'dasbor_wali';
+        else if (canInputMapel) window.currentRaportTab = 'input_mapel';
         else if (canInputTahfidz) window.currentRaportTab = 'input_tahfidz';
         else if (canPreview) window.currentRaportTab = 'preview';
         else if (canArsip) window.currentRaportTab = 'arsip';
     }
 
     let tabs = '';
+    if (canDasborWali) tabs += `<button onclick="window.switchRaportTab('dasbor_wali')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'dasbor_wali' ? 'bg-purple-600 text-white border-b-4 border-purple-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-chart-pie mr-2"></i> Dasbor Wali Kelas</button>`;
     if (canInputMapel) tabs += `<button onclick="window.switchRaportTab('input_mapel')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'input_mapel' ? 'bg-blue-600 text-white border-b-4 border-blue-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-pen-nib mr-2"></i> Input Nilai Mapel (Guru)</button>`;
     if (canInputTahfidz) tabs += `<button onclick="window.switchRaportTab('input_tahfidz')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'input_tahfidz' ? 'bg-teal-600 text-white border-b-4 border-teal-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-book-quran mr-2"></i> Input Raport Tahfidz</button>`;
     if (canPreview) tabs += `<button onclick="window.switchRaportTab('preview')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'preview' ? 'bg-indigo-600 text-white border-b-4 border-indigo-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-file-signature mr-2"></i> Preview & Cetak (Wali Kelas)</button>`;
@@ -78,7 +81,8 @@ export async function renderHalamanRaport(container) {
         <div id="raport-content-area" class="animate-fade-in"></div>
     `;
 
-    if (window.currentRaportTab === 'input_mapel') window.renderInputMapel();
+    if (window.currentRaportTab === 'dasbor_wali') window.renderDasborWali();
+    else if (window.currentRaportTab === 'input_mapel') window.renderInputMapel();
     else if (window.currentRaportTab === 'input_tahfidz') window.renderInputTahfidz();
     else if (window.currentRaportTab === 'preview') window.renderPreviewRaport();
     else if (window.currentRaportTab === 'arsip') {
@@ -89,6 +93,422 @@ export async function renderHalamanRaport(container) {
 
 window.switchRaportTab = function(tab) {
     window.currentRaportTab = tab; window.navigate('raport');
+};
+
+// ==========================================
+// TAB DASBOR WALI KELAS (BARU)
+// ==========================================
+window.renderDasborWali = async function() {
+    if (typeof window.Chart === 'undefined') {
+        await new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+            script.onload = resolve;
+            document.head.appendChild(script);
+        });
+    }
+
+    const area = document.getElementById('raport-content-area');
+    const currentUser = window.currentUser || {};
+    const kelas = currentUser.waliKelas;
+
+    if (!kelas || kelas === "Belum diatur" || kelas === "") {
+        area.innerHTML = `<div class="bg-white p-8 rounded-2xl border border-slate-200 text-center shadow-sm"><i class="fa-solid fa-triangle-exclamation text-5xl text-amber-500 mb-4 block"></i><h3 class="text-xl font-black text-slate-700">Akses Terbatas</h3><p class="text-slate-500 font-bold mt-2">Anda belum ditugaskan sebagai Wali Kelas tertentu di profil Anda. Dasbor ini dikhususkan untuk memantau data kelas secara spesifik.</p></div>`;
+        return;
+    }
+
+    area.innerHTML = `<div class="text-center p-12 bg-white rounded-2xl border border-slate-100 shadow-sm"><i class="fa-solid fa-circle-notch fa-spin text-4xl text-purple-500 mb-4 block"></i><p class="font-bold text-slate-500">Memproses visualisasi grafik, tren, dan metrik kelas ${kelas}...</p></div>`;
+
+    const lembaga = window.appState.lembaga[0] || {};
+    let expectedMapels = [];
+    let mapelRaw = lembaga.daftarMapel || lembaga.mataPelajaran || ''; 
+    if (Array.isArray(mapelRaw)) { expectedMapels = mapelRaw.map(m => typeof m === 'string' ? m : m.nama); }
+    else if (typeof mapelRaw === 'string' && mapelRaw.trim() !== '') { expectedMapels = mapelRaw.split(',').map(m => m.trim()); }
+
+    const siswaKelas = (window.appState.anak || []).filter(a => a.kelas === kelas && a.statusAkademik !== 'Lulus');
+    const jmlSiswa = siswaKelas.length;
+    
+    const now = new Date();
+    const offset = now.getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(now - offset)).toISOString().slice(0, 10);
+    const curBulan = localISOTime.substring(0, 7);
+
+    let hadirHariIni = 0, sakitBulanIni = 0, izinBulanIni = 0, alpaBulanIni = 0;
+    let totalPoinPelanggaran = 0, totalPoinPrestasi = 0;
+    let totalNilai = 0, countNilai = 0;
+    let monitoringDataSiswa = [];
+    
+    let mapNilaiSiswaBulanIni = {};
+    window.rawTrendNilaiKelas = []; 
+    
+    let mapelGradedCount = {};
+    expectedMapels.forEach(m => mapelGradedCount[m] = 0);
+    let siswaRemedial = []; 
+
+    siswaKelas.forEach(s => { mapNilaiSiswaBulanIni[s.id] = { nama: s.nama, total: 0, count: 0, rataRata: 0 }; });
+
+    try {
+        const { db } = await import('./firebase-init.js');
+        const { collection, getDocs, query, where } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
+
+        const snapAbsen = await getDocs(query(collection(db, "AbsensiSiswa"), where("kelas", "==", kelas)));
+        let petaAbsenSiswa = {};
+        
+        siswaKelas.forEach(s => {
+            petaAbsenSiswa[s.id] = { sakit: 0, izin: 0, alpa: 0, hadirHariIni: '-' };
+        });
+
+        snapAbsen.forEach(d => {
+            const data = d.data();
+            if(data.tanggal && data.detailSiswa) {
+                data.detailSiswa.forEach(ds => {
+                    const idTarget = ds.idSiswa || ds.id;
+                    if(petaAbsenSiswa[idTarget]) {
+                        const obj = petaAbsenSiswa[idTarget];
+                        if(data.tanggal.startsWith(curBulan)) {
+                            if(ds.status === 'Sakit') { sakitBulanIni++; obj.sakit++; }
+                            if(ds.status === 'Izin') { izinBulanIni++; obj.izin++; }
+                            if(ds.status === 'Alpa') { alpaBulanIni++; obj.alpa++; }
+                        }
+                        if(data.tanggal === localISOTime) {
+                            if(ds.status === 'Hadir') { hadirHariIni++; obj.hadirHariIni = 'Hadir'; }
+                            else { obj.hadirHariIni = ds.status; }
+                        }
+                    }
+                });
+            }
+        });
+
+        let petaKarakterSiswa = {};
+        siswaKelas.forEach(s => { petaKarakterSiswa[s.id] = { prestasi: 0, pelanggaran: 0 }; });
+
+        const snapAsrama = await getDocs(collection(db, "Kepengasuhan"));
+        snapAsrama.forEach(d => {
+            const data = d.data();
+            if(data.tanggal && data.tanggal.startsWith(curBulan) && petaKarakterSiswa[data.idSiswa]) {
+                if(data.kategori === 'Pelanggaran') {
+                    totalPoinPelanggaran += Number(data.poin || 0);
+                    petaKarakterSiswa[data.idSiswa].pelanggaran += Number(data.poin || 0);
+                } else if(data.kategori === 'Prestasi') {
+                    totalPoinPrestasi += Number(data.poin || 0);
+                    petaKarakterSiswa[data.idSiswa].prestasi += Number(data.poin || 0);
+                }
+            }
+        });
+
+        const snapNilaiAll = await getDocs(collection(db, "NilaiMapel"));
+        snapNilaiAll.forEach(d => {
+            const data = d.data();
+            if(siswaKelas.some(s => s.id === data.idSiswa)) {
+                window.rawTrendNilaiKelas.push(data);
+                
+                if(data.bulan === curBulan) {
+                    totalNilai += Number(data.nilai || 0);
+                    countNilai++;
+                    
+                    if(mapelGradedCount[data.mapel] !== undefined) mapelGradedCount[data.mapel]++;
+                    else mapelGradedCount[data.mapel] = 1;
+
+                    if (Number(data.nilai) < Number(data.kkm || 75)) {
+                        siswaRemedial.push({ nama: data.namaSiswa, mapel: data.mapel, nilai: data.nilai, kkm: data.kkm || 75 });
+                    }
+
+                    if(mapNilaiSiswaBulanIni[data.idSiswa]) {
+                        mapNilaiSiswaBulanIni[data.idSiswa].total += Number(data.nilai || 0);
+                        mapNilaiSiswaBulanIni[data.idSiswa].count++;
+                    }
+                }
+            }
+        });
+
+        const rataRataKelas = countNilai > 0 ? (totalNilai / countNilai).toFixed(1) : 0;
+
+        Object.keys(mapNilaiSiswaBulanIni).forEach(id => {
+            let s = mapNilaiSiswaBulanIni[id];
+            s.rataRata = s.count > 0 ? (s.total / s.count).toFixed(1) : 0;
+        });
+        
+        const rankingSiswa = Object.values(mapNilaiSiswaBulanIni)
+            .filter(s => s.count > 0)
+            .sort((a, b) => b.rataRata - a.rataRata)
+            .slice(0, 10);
+
+        let tabelRankingHTML = rankingSiswa.length > 0 ? rankingSiswa.map((r, idx) => `
+            <tr class="border-b border-slate-100 hover:bg-yellow-50 transition">
+                <td class="p-3 text-center font-black ${idx < 3 ? 'text-yellow-500 text-lg' : 'text-slate-400'}">${idx + 1}</td>
+                <td class="p-3 font-bold text-slate-800">${r.nama}</td>
+                <td class="p-3 text-center font-black text-indigo-600">${r.rataRata}</td>
+                <td class="p-3 text-center text-xs text-slate-400">${r.count} Mapel</td>
+            </tr>
+        `).join('') : '<tr><td colspan="4" class="text-center p-4 text-slate-400 font-bold">Belum ada data nilai akademik bulan ini.</td></tr>';
+
+        let optTrendSiswa = `<option value="Semua">-- Rata-Rata Seluruh Kelas --</option>` + siswaKelas.map(s => `<option value="${s.id}">${s.nama}</option>`).join('');
+
+        siswaKelas.forEach(s => {
+            const abs = petaAbsenSiswa[s.id] || { sakit: 0, izin: 0, alpa: 0, hadirHariIni: '-' };
+            const kar = petaKarakterSiswa[s.id] || { prestasi: 0, pelanggaran: 0 };
+            monitoringDataSiswa.push({
+                nis: s.nis || '-',
+                nama: s.nama,
+                statusHariIni: abs.hadirHariIni,
+                sakit: abs.sakit,
+                izin: abs.izin,
+                alpa: abs.alpa,
+                prestasi: kar.prestasi,
+                pelanggaran: kar.pelanggaran
+            });
+        });
+
+        let tabelHTML = `
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm overflow-x-auto mb-6">
+                <h3 class="text-sm font-black text-slate-700 mb-4 flex items-center">
+                    <i class="fa-solid fa-table text-indigo-500 mr-2"></i> 
+                    Tabel Monitoring Sinkronisasi & Rekapitulasi Data Firestore
+                </h3>
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
+                            <th class="p-3">NIS</th>
+                            <th class="p-3">Nama Siswa</th>
+                            <th class="p-3 text-center">Hari Ini</th>
+                            <th class="p-3 text-center">Sakit</th>
+                            <th class="p-3 text-center">Izin</th>
+                            <th class="p-3 text-center">Alpa</th>
+                            <th class="p-3 text-center">Poin Kebaikan</th>
+                            <th class="p-3 text-center">Poin Disiplin</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 font-medium text-slate-700">
+        `;
+
+        monitoringDataSiswa.forEach(row => {
+            let badgeHariIni = `<span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold">${row.statusHariIni}</span>`;
+            if(row.statusHariIni === 'Hadir') badgeHariIni = `<span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold">Hadir</span>`;
+            if(row.statusHariIni === 'Sakit') badgeHariIni = `<span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-bold">Sakit</span>`;
+            if(row.statusHariIni === 'Izin') badgeHariIni = `<span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold">Izin</span>`;
+            if(row.statusHariIni === 'Alpa') badgeHariIni = `<span class="bg-rose-100 text-rose-700 px-2 py-0.5 rounded font-bold">Alpa</span>`;
+
+            tabelHTML += `
+                <tr class="hover:bg-slate-50/80 transition">
+                    <td class="p-3 font-mono">${row.nis}</td>
+                    <td class="p-3 font-bold">${row.nama}</td>
+                    <td class="p-3 text-center">${badgeHariIni}</td>
+                    <td class="p-3 text-center font-bold text-amber-600">${row.sakit}</td>
+                    <td class="p-3 text-center font-bold text-blue-600">${row.izin}</td>
+                    <td class="p-3 text-center font-bold text-rose-600">${row.alpa}</td>
+                    <td class="p-3 text-center font-bold text-teal-600">${row.prestasi}</td>
+                    <td class="p-3 text-center font-bold text-rose-600">${row.pelanggaran}</td>
+                </tr>
+            `;
+        });
+        tabelHTML += `</tbody></table></div>`;
+
+        let guruBelumNilaiHTML = expectedMapels.map(m => {
+            let c = mapelGradedCount[m] || 0;
+            if(c < jmlSiswa) return `<li class="border-b border-orange-200/50 py-2 flex justify-between items-center"><span class="font-bold text-xs truncate pr-2">${m}</span> <span class="bg-white/30 px-2 py-0.5 rounded text-[10px] font-black shrink-0 shadow-sm">${c}/${jmlSiswa} Siswa</span></li>`;
+            return '';
+        }).join('');
+        if(!guruBelumNilaiHTML) guruBelumNilaiHTML = '<p class="text-xs font-bold bg-white/20 p-3 rounded-lg text-center shadow-inner mt-2"><i class="fa-solid fa-check-double mr-1"></i> Semua mapel sudah dinilai!</p>';
+
+        let remedialHTML = siswaRemedial.map(r => `
+            <li class="border-b border-rose-200/50 py-2 flex flex-col">
+                <div class="flex justify-between items-center"><span class="font-black text-xs truncate pr-2">${r.nama}</span> <span class="bg-white/30 px-2 py-0.5 rounded text-[10px] font-black shrink-0 shadow-sm">${r.nilai} <span class="opacity-70 font-medium">/ ${r.kkm}</span></span></div>
+                <span class="text-[9px] font-medium opacity-90 mt-0.5 truncate">${r.mapel}</span>
+            </li>
+        `).join('');
+        if(!remedialHTML) remedialHTML = '<p class="text-xs font-bold bg-white/20 p-3 rounded-lg text-center shadow-inner mt-2"><i class="fa-solid fa-check-double mr-1"></i> Semua siswa melampaui KKM!</p>';
+
+        area.innerHTML = `
+            <div class="bg-gradient-to-br from-purple-600 to-indigo-700 p-8 rounded-3xl shadow-lg text-white mb-6 relative overflow-hidden animate-slide-up">
+                <div class="absolute right-0 top-0 opacity-10 pointer-events-none"><i class="fa-solid fa-chalkboard-user text-9xl -mt-4 -mr-4"></i></div>
+                <h2 class="text-2xl md:text-3xl font-black mb-2 relative z-10"><i class="fa-solid fa-crown text-yellow-300 mr-2"></i> Dasbor Wali Kelas ${kelas}</h2>
+                <p class="text-purple-100 font-bold relative z-10 text-sm">Pemantauan 360° akademik, kedisiplinan, dan kelengkapan nilai siswa bulan ini.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 text-center flex flex-col justify-center">
+                    <span class="text-[10px] font-black uppercase text-slate-400 block mb-1">Rata-Rata Akademik</span>
+                    <h5 class="text-3xl font-black text-indigo-600">${rataRataKelas}</h5>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 text-center flex flex-col justify-center">
+                    <span class="text-[10px] font-black uppercase text-slate-400 block mb-1">Hadir Hari Ini</span>
+                    <h5 class="text-3xl font-black text-emerald-600">${hadirHariIni} <span class="text-sm text-emerald-400">/ ${jmlSiswa}</span></h5>
+                </div>
+                <div class="bg-gradient-to-br from-orange-400 to-amber-600 p-4 rounded-xl shadow-md text-white flex flex-col h-48">
+                    <h3 class="text-xs font-black uppercase tracking-wider mb-2 flex items-center border-b border-orange-300/50 pb-2"><i class="fa-solid fa-clipboard-question mr-2"></i> Belum Selesai Dinilai</h3>
+                    <ul class="flex-1 overflow-y-auto custom-scrollbar pr-1">${guruBelumNilaiHTML}</ul>
+                </div>
+                <div class="bg-gradient-to-br from-rose-500 to-red-600 p-4 rounded-xl shadow-md text-white flex flex-col h-48">
+                    <h3 class="text-xs font-black uppercase tracking-wider mb-2 flex items-center border-b border-rose-300/50 pb-2"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Wajib Remedial</h3>
+                    <ul class="flex-1 overflow-y-auto custom-scrollbar pr-1">${remedialHTML}</ul>
+                </div>
+            </div>
+
+            <!-- WIDGET JUARA KELAS & TREN -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <div class="lg:col-span-1 bg-gradient-to-b from-yellow-50 to-white p-6 rounded-2xl border border-yellow-200 shadow-sm flex flex-col max-h-[420px]">
+                    <h3 class="text-sm font-black text-yellow-800 mb-4 flex items-center border-b border-yellow-200 pb-2 shrink-0">
+                        <i class="fa-solid fa-trophy text-yellow-500 mr-2"></i> Top 10 Juara Kelas (Bulan Ini)
+                    </h3>
+                    <div class="overflow-y-auto flex-1 custom-scrollbar">
+                        <table class="w-full text-left text-sm">
+                            <thead class="sticky top-0 bg-yellow-50"><tr class="text-[10px] uppercase text-slate-400 border-b border-slate-200"><th class="p-2 text-center">Rank</th><th class="p-2">Siswa</th><th class="p-2 text-center">Rata-rata</th><th class="p-2 text-center">Data</th></tr></thead>
+                            <tbody>${tabelRankingHTML}</tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col max-h-[420px]">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 border-b border-slate-100 pb-3 gap-3 shrink-0">
+                        <div>
+                            <h3 class="text-sm font-black text-slate-700 mb-1">Grafik Tren Akademik Semester</h3>
+                            <p class="text-[11px] text-slate-400 font-bold">Perkembangan dari bulan ke bulan, semester ke semester.</p>
+                        </div>
+                        <select id="trend-siswa-select" onchange="window.updateTrendRaportWali()" class="w-full sm:w-auto border-2 border-indigo-100 p-2 rounded-lg text-xs font-bold focus:outline-indigo-500 bg-indigo-50 text-indigo-800 cursor-pointer shadow-sm">
+                            ${optTrendSiswa}
+                        </select>
+                    </div>
+                    
+                    <div class="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden">
+                        <div class="w-full md:w-1/2 flex flex-col overflow-hidden">
+                            <div class="flex-1 min-h-[200px] w-full relative"><canvas id="canvasTrendKelas"></canvas></div>
+                        </div>
+                        <div class="w-full md:w-1/2 overflow-y-auto custom-scrollbar border border-slate-100 rounded-xl">
+                            <table class="w-full text-left text-xs whitespace-nowrap">
+                                <thead class="bg-slate-100 text-slate-500 sticky top-0 uppercase">
+                                    <tr><th class="p-2">Bulan</th><th class="p-2">Semester</th><th class="p-2 text-center">Rata-Rata</th></tr>
+                                </thead>
+                                <tbody id="tbody-trend-kelas"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GRAFIK PIE & BAR LAMA -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-sm font-black text-slate-700 mb-1">Proporsi Status Kehadiran Kelas (Bulan Ini)</h3>
+                        <p class="text-[11px] text-slate-400 font-bold mb-4">Grafik lingkaran pembagian akumulasi absensi.</p>
+                    </div>
+                    <div class="max-h-[260px] flex justify-center items-center">
+                        <canvas id="canvasPieAbsen" class="max-w-[220px] max-h-[220px]"></canvas>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-sm font-black text-slate-700 mb-1">Perbandingan Akumulasi Poin Karakter</h3>
+                        <p class="text-[11px] text-slate-400 font-bold mb-4">Grafik batang total poin prestasi kebaikan vs pelanggaran disiplin.</p>
+                    </div>
+                    <div class="max-h-[260px]">
+                        <canvas id="canvasBarKarakter" class="w-full h-full"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            ${tabelHTML}
+        `;
+
+        window.updateTrendRaportWali();
+
+        const ctxPie = document.getElementById('canvasPieAbsen').getContext('2d');
+        new window.Chart(ctxPie, {
+            type: 'pie',
+            data: {
+                labels: ['Hadir Hari Ini', 'Sakit', 'Izin', 'Alpa'],
+                datasets: [{
+                    data: [hadirHariIni, sakitBulanIni, izinBulanIni, alpaBulanIni],
+                    backgroundColor: ['#10b981', '#f59e0b', '#3b82f6', '#ef4444'],
+                    borderWidth: 2, borderColor: '#ffffff'
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { weight: 'bold', size: 10 } } } } }
+        });
+
+        const ctxBar = document.getElementById('canvasBarKarakter').getContext('2d');
+        new window.Chart(ctxBar, {
+            type: 'bar',
+            data: {
+                labels: ['Poin Kebaikan (Prestasi)', 'Poin Disiplin (Pelanggaran)'],
+                datasets: [{
+                    label: 'Total Akumulasi Poin',
+                    data: [totalPoinPrestasi, totalPoinPelanggaran],
+                    backgroundColor: ['#14b8a6', '#f43f5e'],
+                    borderRadius: 8
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+        });
+
+    } catch(e) {
+        area.innerHTML = `<div class="p-8 text-center bg-white rounded-2xl border border-rose-200 text-rose-500 font-bold"><i class="fa-solid fa-triangle-exclamation text-4xl mb-3 block"></i> Gagal merender grafik analisis visual kelas. Detail: ${e.message}</div>`;
+    }
+};
+
+window.updateTrendRaportWali = function() {
+    const idSiswa = document.getElementById('trend-siswa-select').value;
+    const rawData = window.rawTrendNilaiKelas || [];
+    
+    let trenBulan = {};
+    rawData.forEach(d => {
+        if(idSiswa === 'Semua' || d.idSiswa === idSiswa) {
+            if(!trenBulan[d.bulan]) trenBulan[d.bulan] = { total: 0, count: 0 };
+            trenBulan[d.bulan].total += Number(d.nilai || 0);
+            trenBulan[d.bulan].count++;
+        }
+    });
+
+    const sortedBulan = Object.keys(trenBulan).sort();
+    const labelTren = [];
+    const dataTren = [];
+    let tabelTrenHTML = '';
+
+    sortedBulan.forEach(b => {
+        const rata = (trenBulan[b].total / trenBulan[b].count).toFixed(1);
+        const semester = window.getSemesterFromBulan(b);
+        labelTren.push(b);
+        dataTren.push(rata);
+
+        tabelTrenHTML += `
+            <tr class="border-b border-slate-100 hover:bg-indigo-50 transition">
+                <td class="p-2 font-bold text-slate-700">${b}</td>
+                <td class="p-2 font-medium text-slate-500 truncate max-w-[120px]" title="${semester}">${semester}</td>
+                <td class="p-2 text-center font-black text-indigo-600">${rata}</td>
+            </tr>
+        `;
+    });
+
+    if (!tabelTrenHTML) tabelTrenHTML = '<tr><td colspan="3" class="text-center p-4 text-slate-400 font-bold">Belum ada data tren.</td></tr>';
+    
+    document.getElementById('tbody-trend-kelas').innerHTML = tabelTrenHTML;
+
+    const ctxTrend = document.getElementById('canvasTrendKelas');
+    if(!ctxTrend) return;
+    
+    if (window.chartTrendKelasInstance) window.chartTrendKelasInstance.destroy();
+    
+    window.chartTrendKelasInstance = new window.Chart(ctxTrend.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: labelTren.length > 0 ? labelTren : ['Belum Ada Data'],
+            datasets: [{
+                label: idSiswa === 'Semua' ? 'Rata-Rata Kelas' : 'Rata-Rata Siswa',
+                data: dataTren.length > 0 ? dataTren : [0],
+                borderColor: '#4f46e5',
+                backgroundColor: 'rgba(79, 70, 229, 0.2)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#ffffff',
+                pointBorderColor: '#4f46e5',
+                pointRadius: 5,
+                pointHoverRadius: 7
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false, min: 0, max: 100 } } }
+    });
 };
 
 // ==========================================
@@ -107,7 +527,6 @@ window.toggleBulkInputMapel = function() {
 
 window.renderInputMapel = function() {
     const lembaga = window.appState.lembaga[0] || {};
-    // --- GEMBOK MODULAR ---
     const isPremium = (lembaga.lisensiFitur || []).includes('raport_plus');
 
     const area = document.getElementById('raport-content-area');
@@ -146,14 +565,23 @@ window.renderInputMapel = function() {
     const bulkRows = anakList.map((a, i) => `
         <tr data-id="${a.id}" data-nama="${a.nama}" class="border-b border-slate-200 hover:bg-slate-50 transition raport-mapel-row">
             <td class="p-2 text-center font-bold text-slate-500">${i+1}</td>
-            <td class="p-2 font-black text-slate-800">${a.nama} <span class="text-[9px] bg-slate-100 text-slate-500 px-1.5 rounded ml-1 border">Kls ${a.kelas||'-'}</span></td>
-            <td class="p-2 bg-blue-50/30"><input type="number" class="mapel-kkm w-full border border-blue-200 p-1.5 rounded text-xs text-center font-bold bg-white focus:outline-blue-500 focus:bg-blue-50" placeholder="KKM" value="75"></td>
-            <td class="p-2 bg-blue-50/30"><input type="number" class="mapel-nilai w-full border border-blue-200 p-1.5 rounded text-xs text-center font-black text-blue-700 bg-white focus:outline-blue-500 focus:bg-blue-50" placeholder="Nilai" oninput="window.calcPredikat(this)"></td>
-            <td class="p-2 bg-blue-50/30"><input type="text" class="mapel-predikat w-full border border-blue-200 p-1.5 rounded text-xs text-center font-black bg-slate-100 text-slate-400 cursor-not-allowed" placeholder="Otomatis" readonly></td>
+            <td class="p-2 font-black text-slate-800 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] z-10">${a.nama} <span class="text-[9px] bg-slate-100 text-slate-500 px-1.5 rounded ml-1 border">Kls ${a.kelas||'-'}</span></td>
+            <td class="p-2 bg-blue-50/30 min-w-[70px]"><input type="number" class="mapel-kkm w-full border border-blue-200 p-1.5 rounded text-xs text-center font-bold bg-white focus:outline-blue-500" placeholder="KKM" value="75"></td>
+            <td class="p-2 bg-blue-50/30 min-w-[70px]"><input type="number" class="mapel-tugas w-full border border-blue-200 p-1.5 rounded text-xs text-center font-bold bg-white focus:outline-blue-500" placeholder="Tugas" value="0"></td>
+            <td class="p-2 bg-blue-50/30 min-w-[70px]"><input type="number" class="mapel-praktek w-full border border-blue-200 p-1.5 rounded text-xs text-center font-bold bg-white focus:outline-blue-500" placeholder="Praktek" value="0"></td>
+            <td class="p-2 bg-blue-50/30 min-w-[90px]">
+                <select class="mapel-adab w-full border border-blue-200 p-1 rounded text-xs font-bold bg-white focus:outline-blue-500">
+                    <option value="A (Sangat Baik)">A (Sangat Baik)</option>
+                    <option value="B (Baik)" selected>B (Baik)</option>
+                    <option value="C (Cukup)">C (Cukup)</option>
+                    <option value="D (Kurang)">D (Kurang)</option>
+                </select>
+            </td>
+            <td class="p-2 bg-blue-100/50 min-w-[80px] border-l border-blue-200"><input type="number" class="mapel-nilai w-full border border-blue-300 p-1.5 rounded text-xs text-center font-black text-blue-800 bg-white focus:outline-blue-600" placeholder="Akhir" oninput="window.calcPredikat(this)"></td>
+            <td class="p-2 bg-blue-100/50 min-w-[100px]"><input type="text" class="mapel-predikat w-full border border-blue-200 p-1.5 rounded text-[10px] text-center font-black bg-slate-100 text-slate-400 cursor-not-allowed" placeholder="Predikat" readonly></td>
         </tr>
     `).join('');
 
-    // --- GEMBOK MODULAR: HIDE CBT & BULK TOGGLE ---
     const btnCBT = isPremium ? `<button type="button" onclick="alert('CBT API siap disambungkan!')" class="bg-purple-100 text-purple-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-purple-200 transition shadow-sm"><i class="fa-solid fa-laptop-code mr-1"></i> Tarik Nilai CBT</button>` : `<button type="button" class="bg-slate-100 text-slate-400 px-3 py-2 rounded-lg text-xs font-bold cursor-not-allowed shadow-sm" title="Integrasi CBT Tersedia di Raport Plus"><i class="fa-solid fa-lock mr-1"></i> Tarik CBT</button>`;
     
     const toggleBulk = isPremium ? `
@@ -179,16 +607,25 @@ window.renderInputMapel = function() {
             </div>
             
             <form id="form-input-mapel" onsubmit="window.simpanInputMapel(event)">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                     <div>
-                        <label class="text-xs font-black text-slate-500 uppercase block mb-1">Bulan & Tahun Evaluasi</label>
-                        <input type="month" id="mapel-bulan" onchange="document.getElementById('lbl-semester-mapel').innerText = window.getSemesterFromBulan(this.value)" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-blue-900 focus:outline-blue-500 bg-white cursor-pointer" required>
+                        <label class="text-xs font-black text-slate-500 uppercase block mb-1">Bulan & Tahun</label>
+                        <input type="month" id="mapel-bulan" onchange="document.getElementById('lbl-semester-mapel').innerText = window.getSemesterFromBulan(this.value); window.loadMonitoringMapel();" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-blue-900 focus:outline-blue-500 bg-white cursor-pointer" required>
                         <p class="text-[10px] font-black text-blue-600 mt-1"><i class="fa-solid fa-info-circle mr-1"></i> <span id="lbl-semester-mapel">Pilih Bulan Terlebih Dahulu</span></p>
                     </div>
                     <div>
-                        <label class="text-xs font-black text-slate-500 uppercase block mb-1">Pilih Mata Pelajaran ${mapelGuruIni.length > 0 ? '<span class="text-emerald-500">(Otomatis Sesuai Jabatan Anda)</span>' : ''}</label>
-                        <select id="mapel-nama" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-blue-900 focus:outline-blue-500 bg-white cursor-pointer" required>
+                        <label class="text-xs font-black text-slate-500 uppercase block mb-1">Mata Pelajaran</label>
+                        <select id="mapel-nama" onchange="window.loadMonitoringMapel()" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-blue-900 focus:outline-blue-500 bg-white cursor-pointer" required>
                             <option value="">-- Pilih Mapel --</option>${optMapel}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs font-black text-slate-500 uppercase block mb-1">Jenis Penilaian</label>
+                        <select id="mapel-jenis-penilaian" onchange="window.loadMonitoringMapel()" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-blue-900 focus:outline-blue-500 bg-white cursor-pointer" required>
+                            <option value="Ulangan Harian">Ulangan Harian</option>
+                            <option value="Ujian Tengah Semester (UTS)">Ujian Tengah Semester (UTS)</option>
+                            <option value="Ujian Akhir Semester (UAS)">Ujian Akhir Semester (UAS)</option>
+                            <option value="Tugas Akhir/Portofolio">Tugas Akhir/Portofolio</option>
                         </select>
                     </div>
                 </div>
@@ -198,26 +635,43 @@ window.renderInputMapel = function() {
                     <select id="mapel-siswa-single" class="w-full border-2 border-blue-100 p-3 rounded-xl font-bold text-blue-900 focus:outline-blue-500 bg-white mb-4 cursor-pointer">
                         <option value="">-- Pilih Satu Siswa --</option>${optAnak}
                     </select>
-                    <div class="grid grid-cols-3 gap-4">
-                        <div><label class="text-[10px] font-bold text-slate-500 uppercase block">KKM</label><input type="number" id="mapel-kkm-single" class="mapel-kkm w-full border-2 p-3 rounded-lg text-sm font-bold text-center focus:outline-blue-500" value="75"></div>
-                        <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Nilai Akhir</label><input type="number" id="mapel-nilai-single" class="mapel-nilai w-full border-2 border-blue-300 p-3 rounded-lg text-sm font-black text-blue-700 bg-blue-50 text-center focus:outline-blue-500" oninput="window.calcPredikat(this)"></div>
-                        <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Predikat</label><input type="text" id="mapel-predikat-single" class="mapel-predikat w-full border-2 p-3 rounded-lg text-sm font-black bg-slate-100 text-center cursor-not-allowed" readonly></div>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-6 gap-4 border-b border-blue-100 pb-4 mb-4">
+                        <div class="col-span-2 md:col-span-1"><label class="text-[10px] font-bold text-slate-500 uppercase block">KKM</label><input type="number" id="mapel-kkm-single" class="mapel-kkm w-full border-2 p-3 rounded-lg text-sm font-bold text-center focus:outline-blue-500" value="75"></div>
+                        <div class="col-span-1"><label class="text-[10px] font-bold text-slate-500 uppercase block">Nilai Tugas</label><input type="number" id="mapel-tugas-single" class="w-full border-2 p-3 rounded-lg text-sm font-bold text-center focus:outline-blue-500" value="0"></div>
+                        <div class="col-span-1"><label class="text-[10px] font-bold text-slate-500 uppercase block">Nilai Praktek</label><input type="number" id="mapel-praktek-single" class="w-full border-2 p-3 rounded-lg text-sm font-bold text-center focus:outline-blue-500" value="0"></div>
+                        <div class="col-span-2"><label class="text-[10px] font-bold text-slate-500 uppercase block">Adab/Akhlaq Mapel</label>
+                            <select id="mapel-adab-single" class="w-full border-2 p-3 rounded-lg text-sm font-bold bg-white focus:outline-blue-500">
+                                <option value="A (Sangat Baik)">A (Sangat Baik)</option>
+                                <option value="B (Baik)" selected>B (Baik)</option>
+                                <option value="C (Cukup)">C (Cukup)</option>
+                                <option value="D (Kurang)">D (Kurang)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label class="text-[10px] font-bold text-blue-600 uppercase block">NILAI AKHIR (Kognitif)</label><input type="number" id="mapel-nilai-single" class="mapel-nilai w-full border-2 border-blue-400 p-3 rounded-lg text-lg font-black text-blue-700 bg-blue-100 text-center focus:outline-blue-600 shadow-inner" oninput="window.calcPredikat(this)"></div>
+                        <div><label class="text-[10px] font-bold text-slate-500 uppercase block">Predikat Kognitif</label><input type="text" id="mapel-predikat-single" class="mapel-predikat w-full border-2 p-3 rounded-lg text-sm font-black bg-slate-100 text-center cursor-not-allowed" readonly></div>
                     </div>
                 </div>
 
                 ${isPremium ? `
-                <div id="mapel-bulk-area" class="hidden bg-white border border-slate-200 p-2 rounded-xl shadow-inner mb-6 overflow-x-auto custom-scrollbar">
-                    <table class="w-full text-left text-sm whitespace-nowrap min-w-[700px]">
+                <div id="mapel-bulk-area" class="hidden bg-white border border-slate-200 p-2 rounded-xl shadow-inner mb-6 overflow-x-auto custom-scrollbar relative">
+                    <table class="w-full text-left text-sm whitespace-nowrap min-w-[900px]">
                         <thead>
                             <tr class="bg-blue-100 border-b border-blue-200">
                                 <th class="p-3 text-center text-xs font-black text-blue-800 w-12">No</th>
-                                <th class="p-3 text-xs font-black text-blue-800">Nama Siswa</th>
-                                <th class="p-3 text-center text-xs font-black text-blue-800 w-24">KKM</th>
-                                <th class="p-3 text-center text-xs font-black text-blue-800 w-28">Nilai Mapel</th>
-                                <th class="p-3 text-center text-xs font-black text-blue-800 w-32">Predikat</th>
+                                <th class="p-3 text-xs font-black text-blue-800 sticky left-0 bg-blue-100 z-10">Nama Siswa</th>
+                                <th class="p-3 text-center text-xs font-black text-blue-800">KKM</th>
+                                <th class="p-3 text-center text-xs font-black text-blue-800">Tugas</th>
+                                <th class="p-3 text-center text-xs font-black text-blue-800">Praktek</th>
+                                <th class="p-3 text-center text-xs font-black text-blue-800">Adab Mapel</th>
+                                <th class="p-3 text-center text-xs font-black text-blue-900 border-l border-blue-200 bg-blue-200/50">N. Akhir</th>
+                                <th class="p-3 text-center text-xs font-black text-blue-800">Predikat</th>
                             </tr>
                         </thead>
-                        <tbody id="tbody-mapel-bulk">${bulkRows || '<tr><td colspan="5" class="text-center text-slate-400 p-6 font-bold">Tidak ada siswa aktif.</td></tr>'}</tbody>
+                        <tbody id="tbody-mapel-bulk">${bulkRows || '<tr><td colspan="8" class="text-center text-slate-400 p-6 font-bold">Tidak ada siswa aktif.</td></tr>'}</tbody>
                     </table>
                 </div>` : ''}
 
@@ -225,7 +679,10 @@ window.renderInputMapel = function() {
                 <div class="clear-both"></div>
             </form>
         </div>
+        
+        <div id="monitoring-mapel-area"></div>
     `;
+    setTimeout(window.loadMonitoringMapel, 100);
 };
 
 window.simpanInputMapel = async function(e) {
@@ -234,6 +691,7 @@ window.simpanInputMapel = async function(e) {
 
     const bulan = document.getElementById('mapel-bulan').value;
     const mapel = document.getElementById('mapel-nama').value;
+    const jenisPenilaian = document.getElementById('mapel-jenis-penilaian').value;
     const isBulk = document.getElementById('mapel-mode-bulk')?.checked;
     let payloads = [];
 
@@ -241,35 +699,118 @@ window.simpanInputMapel = async function(e) {
         document.querySelectorAll('#tbody-mapel-bulk tr').forEach(tr => {
             const idSiswa = tr.dataset.id; const namaSiswa = tr.dataset.nama;
             const kkm = Number(tr.querySelector('.mapel-kkm').value);
+            const tugas = Number(tr.querySelector('.mapel-tugas').value);
+            const praktek = Number(tr.querySelector('.mapel-praktek').value);
+            const adab = tr.querySelector('.mapel-adab').value;
             const nilai = Number(tr.querySelector('.mapel-nilai').value);
             const predikat = tr.querySelector('.mapel-predikat').value;
-            if(nilai > 0) payloads.push({ idSiswa, namaSiswa, bulan, mapel, kkm, nilai, predikat, guru: window.currentUser.nama, updatedAt: new Date().toISOString() });
+            
+            if(nilai > 0 || tugas > 0 || praktek > 0) {
+                payloads.push({ idSiswa, namaSiswa, bulan, mapel, jenisPenilaian, kkm, tugas, praktek, adab, nilai, predikat, guru: window.currentUser.nama, updatedAt: new Date().toISOString() });
+            }
         });
     } else {
         const sVal = document.getElementById('mapel-siswa-single').value;
         if(!sVal) { alert("Pilih siswa terlebih dahulu!"); btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Setor Nilai'; btn.disabled = false; return; }
         const [idSiswa, namaSiswa] = sVal.split('|');
         const kkm = Number(document.getElementById('mapel-kkm-single').value);
+        const tugas = Number(document.getElementById('mapel-tugas-single').value);
+        const praktek = Number(document.getElementById('mapel-praktek-single').value);
+        const adab = document.getElementById('mapel-adab-single').value;
         const nilai = Number(document.getElementById('mapel-nilai-single').value);
         const predikat = document.getElementById('mapel-predikat-single').value;
-        if(nilai > 0) payloads.push({ idSiswa, namaSiswa, bulan, mapel, kkm, nilai, predikat, guru: window.currentUser.nama, updatedAt: new Date().toISOString() });
+        
+        if(nilai > 0 || tugas > 0 || praktek > 0) {
+            payloads.push({ idSiswa, namaSiswa, bulan, mapel, jenisPenilaian, kkm, tugas, praktek, adab, nilai, predikat, guru: window.currentUser.nama, updatedAt: new Date().toISOString() });
+        }
     }
 
     if(payloads.length === 0) { alert("Tidak ada nilai valid yang dimasukkan."); btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Setor Nilai'; btn.disabled = false; return; }
 
     try {
+        const { writeBatch, doc } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
+        const { db } = await import('./firebase-init.js');
+        
         const batch = writeBatch(db);
         payloads.forEach(p => {
-            const docId = `NM_${p.idSiswa}_${p.mapel.replace(/\s+/g,'')}_${p.bulan}`;
+            // Gunakan Jenis Penilaian untuk memisahkan ID dokumen agar UH, UTS, UAS tidak saling timpa
+            const formatJenis = p.jenisPenilaian.replace(/\s+/g,'_').substring(0,8);
+            const docId = `NM_${p.idSiswa}_${p.mapel.replace(/\s+/g,'')}_${p.bulan}_${formatJenis}`;
             batch.set(doc(db, "NilaiMapel", docId), p);
         });
         await batch.commit();
-        alert(`Berhasil menyetor nilai untuk ${payloads.length} siswa.`);
-        document.getElementById('form-input-mapel').reset();
-        document.getElementById('lbl-semester-mapel').innerText = "Pilih Bulan Terlebih Dahulu";
+        alert(`Berhasil menyetor nilai untuk ${payloads.length} entri siswa.`);
+        
+        if(!isBulk) {
+            document.getElementById('mapel-nilai-single').value = '';
+            document.getElementById('mapel-tugas-single').value = '0';
+            document.getElementById('mapel-praktek-single').value = '0';
+            document.getElementById('mapel-predikat-single').value = '';
+        }
+        window.loadMonitoringMapel();
     } catch(err) { alert("Gagal menyetor nilai: " + err.message); }
     
     btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Setor Nilai'; btn.disabled = false;
+};
+
+// Fungsi Baru: Menampilkan UI Tabel Monitoring sesuai input parameter
+window.loadMonitoringMapel = async function() {
+    const area = document.getElementById('monitoring-mapel-area');
+    if(!area) return;
+
+    const bulan = document.getElementById('mapel-bulan').value;
+    const mapel = document.getElementById('mapel-nama').value;
+    const jenis = document.getElementById('mapel-jenis-penilaian').value;
+
+    if(!bulan || !mapel) {
+        area.innerHTML = `<div class="bg-slate-50 border border-slate-200 p-6 rounded-2xl text-center text-slate-400 font-bold"><i class="fa-solid fa-table mr-2"></i> Pilih Bulan dan Mapel untuk memonitor data tersimpan.</div>`;
+        return;
+    }
+
+    area.innerHTML = `<div class="text-center p-6 text-blue-500 font-bold"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Memuat data sinkronisasi...</div>`;
+
+    try {
+        const { db } = await import('./firebase-init.js');
+        const { collection, getDocs, query, where } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
+        
+        const qN = query(collection(db, "NilaiMapel"), where("bulan", "==", bulan), where("mapel", "==", mapel), where("jenisPenilaian", "==", jenis));
+        const snapN = await getDocs(qN);
+        
+        let htmlRows = '';
+        snapN.forEach(d => {
+            const data = d.data();
+            htmlRows += `
+                <tr class="border-b border-slate-100 hover:bg-slate-50 transition">
+                    <td class="p-2 font-bold text-slate-800">${data.namaSiswa}</td>
+                    <td class="p-2 text-center text-slate-600">${data.tugas || 0}</td>
+                    <td class="p-2 text-center text-slate-600">${data.praktek || 0}</td>
+                    <td class="p-2 text-center font-bold text-amber-600">${data.adab || '-'}</td>
+                    <td class="p-2 text-center font-black text-blue-600">${data.nilai}</td>
+                    <td class="p-2 text-center text-xs text-slate-500">${new Date(data.updatedAt).toLocaleDateString('id-ID')}</td>
+                </tr>
+            `;
+        });
+
+        if(!htmlRows) htmlRows = `<tr><td colspan="6" class="p-6 text-center text-slate-400 font-bold">Belum ada data disetor untuk kombinasi ini.</td></tr>`;
+
+        area.innerHTML = `
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden animate-fade-in">
+                <div class="bg-slate-800 text-white p-4 flex justify-between items-center">
+                    <h3 class="font-black text-sm"><i class="fa-solid fa-database text-blue-400 mr-2"></i> Tabel Monitoring Sinkronisasi: ${mapel} (${jenis})</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-100 text-slate-600 text-xs uppercase">
+                            <tr><th class="p-3">Siswa</th><th class="p-3 text-center">N. Tugas</th><th class="p-3 text-center">N. Praktek</th><th class="p-3 text-center">Adab</th><th class="p-3 text-center">N. Akhir</th><th class="p-3 text-center">Terakhir Disimpan</th></tr>
+                        </thead>
+                        <tbody>${htmlRows}</tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    } catch(e) {
+        area.innerHTML = `<div class="p-6 bg-red-50 text-red-500 text-center font-bold border border-red-200 rounded-2xl">Gagal memuat monitoring data.</div>`;
+    }
 };
 
 // ==========================================
@@ -444,22 +985,32 @@ window.renderPreviewRaport = function() {
     area.innerHTML = `
         <div class="bg-indigo-50 p-6 md:p-8 rounded-2xl shadow-sm mb-6 border-t-4 border-indigo-500">
             <h2 class="text-xl font-black text-indigo-900 mb-6 border-b border-indigo-200 pb-4"><i class="fa-solid fa-file-signature mr-2 text-indigo-500"></i> Kompilasi & Preview Raport (Wali Kelas)</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                 <div>
-                    <label class="text-xs font-black text-slate-500 uppercase block mb-1">Pilih Jenis Raport</label>
-                    <select id="prev-jenis" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-indigo-900 focus:outline-indigo-500 bg-white" required>
+                    <label class="text-xs font-black text-slate-500 uppercase block mb-1">Jenis Raport</label>
+                    <select id="prev-jenis" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-indigo-900 focus:outline-indigo-500 bg-white cursor-pointer" required>
                         <option value="Umum">Raport Akademik Umum</option>
                         <option value="Tahfidz">Raport Tahfidz & Kepengasuhan</option>
                     </select>
                 </div>
                 <div>
-                    <label class="text-xs font-black text-slate-500 uppercase block mb-1">Pilih Bulan & Tahun Evaluasi</label>
-                    <input type="month" id="prev-bulan" onchange="document.getElementById('lbl-prev-semester').innerText = window.getSemesterFromBulan(this.value)" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-indigo-900 focus:outline-indigo-500 bg-white" required>
+                    <label class="text-xs font-black text-slate-500 uppercase block mb-1">Bulan & Tahun Evaluasi</label>
+                    <input type="month" id="prev-bulan" onchange="document.getElementById('lbl-prev-semester').innerText = window.getSemesterFromBulan(this.value)" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-indigo-900 focus:outline-indigo-500 bg-white cursor-pointer" required>
                     <p class="text-[10px] font-black text-indigo-600 mt-1" id="lbl-prev-semester">Pilih Bulan Terlebih Dahulu</p>
                 </div>
                 <div>
+                    <label class="text-xs font-black text-slate-500 uppercase block mb-1">Jenis Penilaian (Khusus Mapel)</label>
+                    <select id="prev-jenis-penilaian" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-indigo-900 focus:outline-indigo-500 bg-white cursor-pointer" required>
+                        <option value="Semua">Semua (Gabungan)</option>
+                        <option value="Ulangan Harian">Ulangan Harian</option>
+                        <option value="Ujian Tengah Semester (UTS)">Ujian Tengah Semester (UTS)</option>
+                        <option value="Ujian Akhir Semester (UAS)">Ujian Akhir Semester (UAS)</option>
+                        <option value="Tugas Akhir/Portofolio">Tugas Akhir/Portofolio</option>
+                    </select>
+                </div>
+                <div>
                     <label class="text-xs font-black text-slate-500 uppercase block mb-1">Target Siswa</label>
-                    <select id="prev-siswa" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-indigo-900 focus:outline-indigo-500 bg-white" required>
+                    <select id="prev-siswa" class="w-full border-2 border-white shadow-sm p-3 rounded-xl font-bold text-indigo-900 focus:outline-indigo-500 bg-white cursor-pointer" required>
                         <option value="">-- Pilih Siswa --</option>${optAnak}
                     </select>
                 </div>
@@ -474,12 +1025,12 @@ window.renderPreviewRaport = function() {
 
 window.generatePreviewRaport = async function() {
     const lembaga = window.appState.lembaga[0] || {};
-    // --- GEMBOK MODULAR ---
     const isPremium = (lembaga.lisensiFitur || []).includes('raport_plus');
 
     const jenis = document.getElementById('prev-jenis').value;
     const bulan = document.getElementById('prev-bulan').value;
     const sVal = document.getElementById('prev-siswa').value;
+    const jenisPenilaian = document.getElementById('prev-jenis-penilaian').value;
     const area = document.getElementById('preview-result-area');
     
     if(!bulan || !sVal) return alert("Silakan isi semua pilihan filter!");
@@ -490,24 +1041,32 @@ window.generatePreviewRaport = async function() {
     area.classList.remove('hidden');
 
     try {
+        const { db } = await import('./firebase-init.js');
+        const { collection, getDocs, query, where, getDoc, doc } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
+
         if(jenis === 'Umum') {
-            const qN = query(collection(db, "NilaiMapel"), where("idSiswa", "==", idSiswa), where("bulan", "==", bulan));
+            let qN;
+            if(jenisPenilaian === 'Semua') {
+                qN = query(collection(db, "NilaiMapel"), where("idSiswa", "==", idSiswa), where("bulan", "==", bulan));
+            } else {
+                qN = query(collection(db, "NilaiMapel"), where("idSiswa", "==", idSiswa), where("bulan", "==", bulan), where("jenisPenilaian", "==", jenisPenilaian));
+            }
+
             const snapN = await getDocs(qN);
             let nilaiMapel = []; let totalNilai = 0;
             snapN.forEach(d => { const n = d.data(); nilaiMapel.push(n); totalNilai += n.nilai; });
             
-            if(nilaiMapel.length === 0) return area.innerHTML = `<div class="text-center p-10 text-rose-500 font-bold"><i class="fa-solid fa-triangle-exclamation text-4xl mb-3 block"></i>Belum ada guru yang menyetor nilai akademik untuk siswa ini di bulan tersebut.</div>`;
+            if(nilaiMapel.length === 0) return area.innerHTML = `<div class="text-center p-10 text-rose-500 font-bold"><i class="fa-solid fa-triangle-exclamation text-4xl mb-3 block"></i>Belum ada guru yang menyetor nilai akademik untuk filter ini di bulan tersebut.</div>`;
             
             const rataRata = (totalNilai / nilaiMapel.length).toFixed(1);
-            let trMapel = nilaiMapel.map((m,i) => `<tr><td class="p-2 border text-center">${i+1}</td><td class="p-2 border">${m.mapel}</td><td class="p-2 border text-center">${m.kkm}</td><td class="p-2 border text-center font-bold">${m.nilai}</td><td class="p-2 border text-center">${m.predikat}</td></tr>`).join('');
+            let trMapel = nilaiMapel.map((m,i) => `<tr><td class="p-2 border text-center">${i+1}</td><td class="p-2 border">${m.mapel} ${jenisPenilaian === 'Semua' && m.jenisPenilaian ? `<span class="text-[9px] bg-slate-100 px-1 rounded block w-max">${m.jenisPenilaian}</span>` : ''}</td><td class="p-2 border text-center">${m.kkm}</td><td class="p-2 border text-center font-bold">${m.nilai}</td><td class="p-2 border text-center">${m.predikat}</td></tr>`).join('');
 
-            window.tempDraftRaport = { jenis, semester, idSiswa, namaSiswa, nilaiMapel, rataRata };
+            window.tempDraftRaport = { jenis, semester, idSiswa, namaSiswa, nilaiMapel, rataRata, jenisPenilaian };
 
-            // --- GEMBOK MODULAR: SINKRONISASI KEHADIRAN SISWA OTOMATIS ---
             const btnSyncAbsen = isPremium ? `<button type="button" onclick="window.tarikAbsensiSiswa('${idSiswa}', '${bulan}')" class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-1 rounded ml-2 font-bold hover:bg-indigo-200 transition shadow-sm"><i class="fa-solid fa-sync mr-1"></i> Auto-Sync Data Kelas</button>` : `<span class="text-[9px] bg-slate-100 text-slate-400 px-2 py-1 rounded ml-2 font-bold cursor-not-allowed border shadow-sm" title="Sinkron Presensi Tersedia di Raport Plus"><i class="fa-solid fa-lock mr-1"></i> Auto-Sync Data Kelas</span>`;
 
             area.innerHTML = `
-                <h3 class="text-xl font-black text-slate-800 text-center uppercase border-b-4 border-indigo-600 pb-4 mb-6">DRAFT RAPORT AKADEMIK UMUM<br><span class="text-sm font-bold text-slate-500">${namaSiswa} | ${semester}</span></h3>
+                <h3 class="text-xl font-black text-slate-800 text-center uppercase border-b-4 border-indigo-600 pb-4 mb-6">DRAFT RAPORT AKADEMIK UMUM<br><span class="text-sm font-bold text-slate-500">${namaSiswa} | ${semester} | Penilaian: ${jenisPenilaian}</span></h3>
                 <div class="mb-6 overflow-x-auto">
                     <table class="w-full text-sm border-collapse">
                         <thead class="bg-slate-100 text-slate-700 font-bold"><tr><td class="p-2 border text-center w-10">No</td><td class="p-2 border">Mata Pelajaran</td><td class="p-2 border text-center w-16">KKM</td><td class="p-2 border text-center w-16">Nilai</td><td class="p-2 border text-center w-24">Predikat</td></tr></thead>
