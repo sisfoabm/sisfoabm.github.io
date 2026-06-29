@@ -242,11 +242,11 @@ export function renderHalamanLembaga(container) {
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-blue-50 p-4 rounded border border-blue-200">
                     <div class="col-span-1 md:col-span-2">
                         <label class="text-sm font-bold text-slate-600 block mb-1">Pilih Tema / Layout (Berubah Langsung Saat Dipilih)</label>
-                        <select id="lem-tema" onchange="document.body.className = this.value" class="border p-2 rounded w-full focus:outline-primary font-semibold text-primary" required>
+                        <select id="lem-tema" onchange="document.body.classList.remove('tema-1', 'tema-2', 'tema-3', 'tema-4', 'tema-5'); document.body.classList.add(this.value);" class="border p-2 rounded w-full focus:outline-primary font-semibold text-primary" required>
                             <option value="tema-1">Template 1: Klasik (Sidebar Kiri)</option>
                             <option value="tema-2">Template 2: Modern (Menu Navigasi Atas)</option>
                             <option value="tema-3">Template 3: Mengambang (Floating UI)</option>
-                            <option value="tema-4">Template 4: Aplikasi Mobile (Menu Bawah di HP)</option>
+                            <option value="tema-4">Template 4: Aplikasi Mobile / Windows (Start Screen)</option>
                             <option value="tema-5">Template 5: Terbalik (Sidebar Kanan)</option>
                         </select>
                     </div>
@@ -694,7 +694,7 @@ export function renderHalamanPegawai(container) {
                         </div>
 
                         <div>
-                            <h3 class="font-bold text-slate-400 text-xs uppercase tracking-wider mb-3 mt-6"><i class="fa-solid fa-address-book mr-2"></i> Biodata Tambahan & Kepegawaian</h3>
+                            <h3 class="font-bold text-slate-400 text-xs uppercase tracking-wider mb-3 mt-6"><i class="fa-solid fa-address-book mr-2"></i> Biodata Tambahan & Personal</h3>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Status Pegawai</label><select id="peg-status-pegawai" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-bold text-slate-700 cursor-pointer"><option value="">-- Pilih Status --</option><option value="Tetap">Tetap</option><option value="Kontrak (PKWT)">Kontrak (PKWT)</option><option value="Harian">Harian</option><option value="Freelance">Freelance</option></select></div>
                                 <div><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">NPWP</label><input type="text" id="peg-npwp" placeholder="Opsional" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-medium"></div>
@@ -704,8 +704,26 @@ export function renderHalamanPegawai(container) {
                                 <div><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Tanggal Lahir</label><input type="date" id="peg-tgl-lahir" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-medium"></div>
                                 <div><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Nomor HP / WA</label><input type="text" id="peg-nohp" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-medium"></div>
                                 
-                                <div class="md:col-span-3"><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Pend. Terakhir & Gelar</label><input type="text" id="peg-pendidikan" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-medium"></div>
                                 <div class="md:col-span-3"><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Alamat Domisili</label><textarea id="peg-alamat" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-medium" rows="2"></textarea></div>
+                                
+                                <div><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Status Pernikahan</label><select id="peg-pernikahan" onchange="document.getElementById('area-anak').classList.toggle('hidden', this.value==='Belum Menikah')" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-bold text-slate-700 cursor-pointer"><option value="Belum Menikah">Belum Menikah</option><option value="Menikah">Menikah</option><option value="Cerai">Cerai</option></select></div>
+                                <div id="area-anak" class="hidden"><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Jumlah Anak</label><input type="number" id="peg-jml-anak" placeholder="Cth: 2" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-bold text-slate-700"></div>
+                                <div><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Berasrama?</label><select id="peg-asrama" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-bold text-slate-700 cursor-pointer"><option value="Tidak">Tidak Berasrama</option><option value="Ya">Tinggal di Asrama</option></select></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="font-bold text-slate-400 text-xs uppercase tracking-wider mb-3 mt-6"><i class="fa-solid fa-file-contract mr-2"></i> Portofolio & Informasi CV</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="md:col-span-2"><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Bio / Tentang Saya</label><textarea id="peg-bio" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-white font-bold text-slate-700 shadow-sm" rows="2" placeholder="Ceritakan deskripsi singkat tentang diri Anda..."></textarea></div>
+                                
+                                <div><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Riwayat Pendidikan (Lengkap)</label><textarea id="peg-riwayat-pend" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-white font-medium custom-scrollbar" rows="4" placeholder="Cth:\n- SD Negeri 1 (2000-2006)\n- S1 Sistem Komputer Universitas Royal (2012-2016)"></textarea></div>
+                                <div><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Pengalaman Kerja</label><textarea id="peg-riwayat-kerja" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-white font-medium custom-scrollbar" rows="4" placeholder="Cth:\n- Guru Honorer SMPN 2 (2016-2018)\n- Kepala Asrama Panti (2019-Sekarang)"></textarea></div>
+                                
+                                <div class="md:col-span-2"><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Keahlian Khusus & Hobi (Pisahkan Koma)</label><textarea id="peg-keahlian" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-white font-bold text-indigo-700 shadow-sm" rows="2" placeholder="Cth: Menguasai HTML & CSS, Modifikasi Motor PCX, Desain Web"></textarea></div>
+                                
+                                <div><label class="text-[10px] font-bold text-pink-500 mb-1 block uppercase"><i class="fa-brands fa-instagram mr-1"></i> Username Instagram</label><input type="text" id="peg-sosmed-ig" placeholder="Cth: @GasMainJauh" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-pink-500 bg-white font-bold text-slate-700 shadow-sm"></div>
+                                <div><label class="text-[10px] font-bold text-blue-600 mb-1 block uppercase"><i class="fa-brands fa-linkedin mr-1"></i> LinkedIn / Facebook</label><input type="text" id="peg-sosmed-in" placeholder="URL Link Profil / Username" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-blue-500 bg-white font-bold text-slate-700 shadow-sm"></div>
                             </div>
                         </div>
 
@@ -740,10 +758,16 @@ export function renderHalamanPegawai(container) {
                                     <option value="Pegawai">Pegawai Biasa</option>
                                 </select>
                             </div>
+                            
+                            <div class="mt-4 pt-4 border-t border-indigo-200/50">
+                                <label class="text-[10px] font-bold text-slate-500 mb-1 block uppercase">Tautan Akun Google SSO</label>
+                                <input type="text" id="peg-google-email" readonly placeholder="Belum Tertaut" class="border-2 border-white p-3 rounded-xl w-full font-bold text-slate-500 shadow-sm bg-slate-100/50 mb-2">
+                                <button type="button" onclick="window.sinkronGoogleAuth()" class="w-full bg-white hover:bg-rose-50 border border-rose-200 text-rose-600 py-3 rounded-xl text-xs font-black shadow-sm transition flex items-center justify-center"><i class="fa-brands fa-google text-lg mr-2"></i> Sinkronkan Google</button>
+                            </div>
                         </div>
 
                         <div>
-                            <h3 class="font-bold text-slate-400 text-xs uppercase tracking-wider mb-2"><i class="fa-solid fa-camera mr-2"></i> Foto Profil</h3>
+                            <h3 class="font-bold text-slate-400 text-xs uppercase tracking-wider mb-2"><i class="fa-solid fa-camera mr-2"></i> Foto Profil CV</h3>
                             <input type="file" id="peg-foto-file" accept="image/*" class="border-2 border-slate-200 p-2 bg-white rounded-xl text-sm w-full font-medium text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
                             <div id="peg-foto-gallery" class="flex flex-wrap mt-3 gap-2"></div>
                         </div>
@@ -767,7 +791,6 @@ export function renderHalamanPegawai(container) {
                                     <option value="">-- Bukan Wali Kelas --</option>
                                     ${daftarKelas.map(k => `<option value="${k}">${k}</option>`).join('')}
                                 </select>
-                                <p class="text-[9px] text-teal-600 font-bold mt-1"><i class="fa-solid fa-rotate mr-1"></i> Data sinkron ke Portal Ortu.</p>
                             </div>
                         </div>
                     </div>
@@ -775,7 +798,7 @@ export function renderHalamanPegawai(container) {
 
                 <div class="mt-8 pt-6 border-t border-slate-100 flex flex-col md:flex-row gap-3">
                     <button type="submit" id="btn-simpan-peg" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-4 rounded-xl font-black text-lg transition shadow-xl transform hover:-translate-y-1"><i class="fa-solid fa-save mr-2"></i> Simpan Profil</button>
-                    <button type="button" onclick="document.getElementById('form-pegawai').reset(); document.getElementById('btn-batal-peg').classList.add('hidden'); document.getElementById('peg-pass').disabled=false; document.getElementById('peg-hak').disabled=false;" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-8 py-4 rounded-xl hidden font-bold transition" id="btn-batal-peg">Batal Edit</button>
+                    <button type="button" onclick="document.getElementById('form-pegawai').reset(); document.getElementById('btn-batal-peg').classList.add('hidden'); document.getElementById('peg-pass').disabled=false; document.getElementById('peg-hak').disabled=false; document.getElementById('area-anak').classList.add('hidden');" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-8 py-4 rounded-xl hidden font-bold transition" id="btn-batal-peg">Batal Edit</button>
                 </div>
             </form>
         </div>
@@ -817,9 +840,11 @@ window.simpanPegawai = async function(e) {
     
     let waliKelasToSave = '';
     let originalUser = null;
+    let googleAkunToSave = '';
 
     if (id) {
         originalUser = window.appState.pegawai.find(x => x.id === id);
+        googleAkunToSave = originalUser.googleAkun || ''; // Pertahankan akun Google yang sudah tertaut
         
         if (isPegawaiBiasa) {
             detailJabatan = originalUser.detailJabatan || [];
@@ -868,6 +893,9 @@ window.simpanPegawai = async function(e) {
         if (uploadedUrl) window.currentPegawaiPhotos.push(uploadedUrl);
     }
 
+    const pernikahanVal = document.getElementById('peg-pernikahan').value;
+    const jmlAnakVal = pernikahanVal !== 'Belum Menikah' ? (document.getElementById('peg-jml-anak').value || '0') : '0';
+
     const data = {
         nama: document.getElementById('peg-nama').value, jk: document.getElementById('peg-jk').value, 
         nik: document.getElementById('peg-nik').value, nip: document.getElementById('peg-nip').value, email: document.getElementById('peg-email').value,
@@ -876,7 +904,13 @@ window.simpanPegawai = async function(e) {
         statusPegawai: document.getElementById('peg-status-pegawai').value, npwp: document.getElementById('peg-npwp').value,
         jenisRek: document.getElementById('peg-jenis-rek').value, namaBank: document.getElementById('peg-nama-bank').value, noRek: document.getElementById('peg-no-rek').value, atasNama: document.getElementById('peg-atas-nama').value,
         nuptk: document.getElementById('peg-nuptk').value, serdik: document.getElementById('peg-serdik').value,
-        username: userToSave, password: passToSave, hakAkses: hakToSave,
+        
+        pernikahan: pernikahanVal, jmlAnak: jmlAnakVal, asrama: document.getElementById('peg-asrama').value,
+        bio: document.getElementById('peg-bio').value, riwayatPend: document.getElementById('peg-riwayat-pend').value,
+        riwayatKerja: document.getElementById('peg-riwayat-kerja').value, keahlian: document.getElementById('peg-keahlian').value,
+        sosmedIg: document.getElementById('peg-sosmed-ig').value, sosmedIn: document.getElementById('peg-sosmed-in').value,
+        
+        googleAkun: googleAkunToSave, username: userToSave, password: passToSave, hakAkses: hakToSave,
         fotoProfil: window.currentPegawaiPhotos, detailJabatan: detailJabatan, waliKelas: waliKelasToSave
     };
 
@@ -901,6 +935,7 @@ window.simpanPegawai = async function(e) {
         document.getElementById('btn-batal-peg').classList.add('hidden');
         document.getElementById('peg-pass').disabled = false;
         document.getElementById('peg-hak').disabled = false;
+        document.getElementById('area-anak').classList.add('hidden');
         
         renderHalamanPegawai(document.getElementById('view-container'));
     } catch (err) { alert("Gagal menyimpan profil!"); }
@@ -925,6 +960,18 @@ window.editPegawai = function(id) {
         document.getElementById('peg-jenis-rek').value = item.jenisRek || ''; document.getElementById('peg-nama-bank').value = item.namaBank || ''; document.getElementById('peg-no-rek').value = item.noRek || ''; document.getElementById('peg-atas-nama').value = item.atasNama || '';
         document.getElementById('peg-nuptk').value = item.nuptk || ''; document.getElementById('peg-serdik').value = item.serdik || '';
         
+        document.getElementById('peg-pernikahan').value = item.pernikahan || 'Belum Menikah';
+        document.getElementById('peg-jml-anak').value = item.jmlAnak || '';
+        document.getElementById('area-anak').classList.toggle('hidden', (item.pernikahan || 'Belum Menikah') === 'Belum Menikah');
+        document.getElementById('peg-asrama').value = item.asrama || 'Tidak';
+        document.getElementById('peg-bio').value = item.bio || '';
+        document.getElementById('peg-riwayat-pend').value = item.riwayatPend || '';
+        document.getElementById('peg-riwayat-kerja').value = item.riwayatKerja || '';
+        document.getElementById('peg-keahlian').value = item.keahlian || '';
+        document.getElementById('peg-sosmed-ig').value = item.sosmedIg || '';
+        document.getElementById('peg-sosmed-in').value = item.sosmedIn || '';
+        document.getElementById('peg-google-email').value = item.googleAkun || 'Belum Tertaut';
+
         const userInput = document.getElementById('peg-user');
         const passInput = document.getElementById('peg-pass');
         const hakInput = document.getElementById('peg-hak');
@@ -986,6 +1033,41 @@ window.editPegawai = function(id) {
         window.handleJabatanCheck(null);
         document.getElementById('btn-batal-peg').classList.remove('hidden'); 
         window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+};
+
+// ==========================================
+// FUNGSI SINKRONISASI GOOGLE AUTH (SSO)
+// ==========================================
+window.sinkronGoogleAuth = async function() {
+    const id = document.getElementById('peg-id').value;
+    if(!id) return alert("Simpan profil terlebih dahulu ke Database sebelum menautkan akun Google!");
+    
+    if(window.currentUser.id !== id) return alert("Akses Ditolak! Anda hanya diizinkan untuk menautkan akun Google pada profil Anda sendiri.");
+
+    try {
+        const { app, db } = await import('./firebase-init.js');
+        const { getAuth, signInWithPopup, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js');
+        const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
+        
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+        
+        const result = await signInWithPopup(auth, provider);
+        const userGoogle = result.user;
+        
+        // Simpan Email Google ke Firestore
+        await updateDoc(doc(db, "Pegawai", id), { googleAkun: userGoogle.email });
+        
+        // Update tampilan & session aktif
+        document.getElementById('peg-google-email').value = userGoogle.email;
+        window.currentUser.googleAkun = userGoogle.email;
+        localStorage.setItem('yayasan_user_v2', JSON.stringify(window.currentUser));
+        
+        alert("Berhasil! Akun Google " + userGoogle.email + " telah tertaut secara permanen dengan profil Anda.");
+    } catch(e) {
+        console.error("Error Google Sync:", e);
+        alert("Gagal menautkan akun Google: " + e.message);
     }
 };
 
