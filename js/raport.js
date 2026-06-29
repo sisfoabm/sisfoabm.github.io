@@ -70,7 +70,7 @@ export async function renderHalamanRaport(container) {
     }
 
     let tabs = '';
-    if (canDasborWali) tabs += `<button onclick="window.switchRaportTab('dasbor_wali')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'dasbor_wali' ? 'bg-purple-600 text-white border-b-4 border-purple-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-chart-pie mr-2"></i> Dasbor Wali Kelas</button>`;
+    if (canDasborWali) tabs += `<button onclick="window.switchRaportTab('dasbor_wali')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'dasbor_wali' ? 'bg-purple-600 text-white border-b-4 border-purple-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-chart-pie mr-2"></i> Dasbor Wali Kelas ${!hasRaportPlus ? '<i class="fa-solid fa-lock text-amber-500 ml-2 text-xs" title="Tersegel Premium"></i>' : ''}</button>`;
     if (canInputMapel) tabs += `<button onclick="window.switchRaportTab('input_mapel')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'input_mapel' ? 'bg-blue-600 text-white border-b-4 border-blue-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-pen-nib mr-2"></i> Input Nilai Mapel (Guru)</button>`;
     if (canInputTahfidz) tabs += `<button onclick="window.switchRaportTab('input_tahfidz')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'input_tahfidz' ? 'bg-teal-600 text-white border-b-4 border-teal-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-book-quran mr-2"></i> Input Raport Tahfidz</button>`;
     if (canPreview) tabs += `<button onclick="window.switchRaportTab('preview')" class="px-5 py-4 rounded-t-2xl font-black transition flex items-center ${window.currentRaportTab === 'preview' ? 'bg-indigo-600 text-white border-b-4 border-indigo-600 translate-y-[4px]' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}"><i class="fa-solid fa-file-signature mr-2"></i> Preview & Cetak (Wali Kelas)</button>`;
@@ -81,7 +81,10 @@ export async function renderHalamanRaport(container) {
         <div id="raport-content-area" class="animate-fade-in"></div>
     `;
 
-    if (window.currentRaportTab === 'dasbor_wali') window.renderDasborWali();
+    if (window.currentRaportTab === 'dasbor_wali') {
+        if (!hasRaportPlus) document.getElementById('raport-content-area').innerHTML = window.renderLockedPremiumHTML('Dasbor Khusus Wali Kelas');
+        else window.renderDasborWali();
+    }
     else if (window.currentRaportTab === 'input_mapel') window.renderInputMapel();
     else if (window.currentRaportTab === 'input_tahfidz') window.renderInputTahfidz();
     else if (window.currentRaportTab === 'preview') window.renderPreviewRaport();
