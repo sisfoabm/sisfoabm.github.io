@@ -71,23 +71,100 @@ function getFreshUser() {
     return user;
 }
 
+window.renderProfilCV = function(container) {
+    const user = window.currentUser || {};
+    const foto = (user.fotoProfil && user.fotoProfil.length > 0) ? user.fotoProfil[0] : `https://ui-avatars.com/api/?name=${user.nama || 'User'}&background=e2e8f0&color=475569&size=200`;
+    const jabatans = (user.detailJabatan || []).map(d => `<span class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-[10px] font-black shadow-sm border border-indigo-200">${d.namaJabatan}</span>`).join(' ') || '-';
+
+    container.innerHTML = `
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 max-w-5xl mx-auto gap-4">
+            <h2 class="text-2xl font-black text-slate-800"><i class="fa-solid fa-address-card text-indigo-500 mr-2"></i> Curriculum Vitae & Profil</h2>
+            <div class="flex gap-2">
+                <button onclick="window.unduhPDF('cv-container', 'CV_${(user.nama||'Pegawai').replace(/\s+/g, '_')}.pdf')" class="bg-rose-500 hover:bg-rose-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition flex items-center transform hover:-translate-y-1"><i class="fa-solid fa-file-pdf mr-2"></i> Download CV</button>
+                <button onclick="window.navigate('pegawai')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition flex items-center transform hover:-translate-y-1"><i class="fa-solid fa-pen mr-2"></i> Edit Profil</button>
+            </div>
+        </div>
+        
+        <div id="cv-container" class="bg-white rounded-3xl shadow-xl overflow-hidden border-t-4 border-indigo-500 relative max-w-5xl mx-auto animate-slide-up p-8 md:p-12 mb-10">
+            <div class="flex flex-col md:flex-row items-center md:items-start gap-8 border-b-2 border-slate-100 pb-8 mb-8">
+                <img src="${foto}" class="w-40 h-40 rounded-3xl object-cover shadow-lg border-4 border-slate-50 shrink-0">
+                <div class="text-center md:text-left flex-1 pt-2">
+                    <h1 class="text-4xl md:text-5xl font-black text-slate-800 uppercase tracking-tight mb-3">${user.nama || 'NAMA LENGKAP'}</h1>
+                    <p class="text-lg font-bold text-indigo-600 mb-4 tracking-wide">${user.hakAkses || 'Pegawai'} <span class="mx-2 text-slate-300">|</span> ${jabatans}</p>
+                    <p class="text-sm font-medium text-slate-500 italic leading-relaxed max-w-3xl">"${user.bio || 'Belum ada bio/deskripsi singkat yang ditambahkan.'}"</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+                <div class="space-y-8">
+                    <div>
+                        <h3 class="font-black text-slate-800 border-b-2 border-indigo-100 pb-2 mb-4 tracking-wider"><i class="fa-solid fa-address-book text-indigo-500 mr-2"></i> KONTAK & SOSMED</h3>
+                        <ul class="space-y-4 text-sm font-bold text-slate-600">
+                            <li class="flex items-center"><i class="fa-solid fa-phone w-6 text-emerald-500 text-lg"></i> ${user.noHp || '-'}</li>
+                            <li class="flex items-center"><i class="fa-solid fa-envelope w-6 text-blue-500 text-lg"></i> <span class="truncate">${user.email || '-'}</span></li>
+                            ${user.googleAkun ? `<li class="flex items-center text-rose-500"><i class="fa-brands fa-google w-6 text-lg"></i> <span class="truncate" title="${user.googleAkun}">Tersinkronisasi</span></li>` : ''}
+                            <li class="flex items-start"><i class="fa-solid fa-location-dot w-6 text-rose-500 text-lg mt-0.5"></i> <span class="leading-relaxed">${user.alamat || '-'}</span></li>
+                            <li class="flex items-center mt-4 pt-4 border-t border-slate-100"><i class="fa-brands fa-instagram w-6 text-pink-500 text-xl"></i> ${user.sosmedIg || '-'}</li>
+                            <li class="flex items-center"><i class="fa-brands fa-linkedin w-6 text-blue-700 text-xl"></i> ${user.sosmedIn || '-'}</li>
+                        </ul>
+                    </div>
+                    
+                    <div>
+                        <h3 class="font-black text-slate-800 border-b-2 border-indigo-100 pb-2 mb-4 tracking-wider"><i class="fa-solid fa-user text-indigo-500 mr-2"></i> INFO PERSONAL</h3>
+                        <ul class="space-y-3 text-sm font-bold text-slate-600">
+                            <li><span class="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Tempat, Tgl Lahir</span> ${user.tempatLahir || '-'}, ${user.tglLahir || '-'}</li>
+                            <li><span class="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Jenis Kelamin</span> ${user.jk || '-'}</li>
+                            <li><span class="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Status Pernikahan</span> ${user.pernikahan || '-'} ${user.jmlAnak ? `<span class="bg-slate-100 px-2 py-0.5 rounded text-xs ml-1">${user.jmlAnak} Anak</span>` : ''}</li>
+                            <li><span class="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Status Asrama</span> <span class="${user.asrama === 'Ya' ? 'text-emerald-600' : ''}">${user.asrama === 'Ya' ? 'Tinggal di Asrama' : 'Tidak Berasrama'}</span></li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h3 class="font-black text-slate-800 border-b-2 border-indigo-100 pb-2 mb-4 tracking-wider"><i class="fa-solid fa-star text-indigo-500 mr-2"></i> KEAHLIAN & HOBI</h3>
+                        <div class="flex flex-wrap gap-2">
+                            ${(user.keahlian || '').split(',').filter(x=>x.trim()).length > 0 ? (user.keahlian||'').split(',').map(k => `<span class="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-lg text-xs font-bold">${k.trim()}</span>`).join('') : '<span class="text-sm font-medium text-slate-400 italic">Belum ada keahlian khusus.</span>'}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="md:col-span-2 space-y-8 pl-0 md:pl-6 md:border-l border-slate-100">
+                    <div>
+                        <h3 class="font-black text-slate-800 border-b-2 border-indigo-100 pb-2 mb-4 tracking-wider"><i class="fa-solid fa-graduation-cap text-indigo-500 mr-2 text-xl"></i> RIWAYAT PENDIDIKAN</h3>
+                        <p class="text-sm font-bold text-slate-600 whitespace-pre-wrap leading-loose">${user.riwayatPend || user.pendidikan || '<span class="italic font-medium text-slate-400">Belum ada riwayat pendidikan yang ditambahkan.</span>'}</p>
+                    </div>
+
+                    <div>
+                        <h3 class="font-black text-slate-800 border-b-2 border-indigo-100 pb-2 mb-4 tracking-wider"><i class="fa-solid fa-briefcase text-indigo-500 mr-2 text-xl"></i> PENGALAMAN KERJA</h3>
+                        <p class="text-sm font-bold text-slate-600 whitespace-pre-wrap leading-loose">${user.riwayatKerja || '<span class="italic font-medium text-slate-400">Belum ada pengalaman kerja yang ditambahkan.</span>'}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+};
+
 export function renderLayout() {
     window.renderSidebarMenu(); 
     
     const currentUser = getFreshUser();
     const lembaga = (window.appState && window.appState.lembaga && window.appState.lembaga[0]) ? window.appState.lembaga[0] : {}; 
     const header = document.getElementById('app-header');
+    
     header.innerHTML = `
         <div class="flex items-center gap-3 w-full max-w-[60%]">
-            ${lembaga.logo ? `<img src="${lembaga.logo}" class="h-8 md:h-10 w-auto object-contain rounded-lg shadow-sm">` : '<i class="fa-solid fa-school text-indigo-500 text-2xl"></i>'}
+            <button onclick="window.kembaliKeStart()" id="btn-win-start" class="hidden text-white text-2xl md:text-3xl mr-3 hover:scale-110 transition drop-shadow-md" title="Kembali ke Start Screen"><i class="fa-brands fa-windows"></i></button>
+            ${lembaga.logo ? `<img src="${lembaga.logo}" class="h-8 md:h-10 w-auto object-contain rounded-lg shadow-sm" id="header-logo-img">` : '<i class="fa-solid fa-school text-indigo-500 text-2xl" id="header-logo-icon"></i>'}
             <div class="flex flex-col truncate">
                 <span class="font-black text-sm md:text-lg uppercase text-indigo-900 truncate" id="header-title">DASHBOARD</span>
-                <span class="text-[10px] md:text-xs font-bold text-slate-500 truncate uppercase tracking-widest">${lembaga.namaLembaga || 'Sistem Informasi Internal'}</span>
+                <span class="text-[10px] md:text-xs font-bold text-slate-500 truncate uppercase tracking-widest" id="header-subtitle">${lembaga.namaLembaga || 'Sistem Informasi Internal'}</span>
             </div>
         </div>
         <div class="flex items-center space-x-2 md:space-x-4 shrink-0">
+            <button onclick="window.location.reload(true)" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-xl text-xs font-black shadow-sm transition" title="Muat Ulang Paksa (Hard Refresh)">
+                <i class="fa-solid fa-arrows-rotate"></i>
+            </button>
             <button onclick="window.navigate('absensi')" class="flex items-center bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white px-3 md:px-4 py-2 rounded-xl text-xs font-black shadow-md transition transform hover:-translate-y-0.5"><i class="fa-solid fa-fingerprint md:mr-2"></i> <span class="hidden md:inline">Presensi</span></button>
-            <div class="flex items-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 px-3 py-1.5 rounded-xl transition border border-transparent hover:border-slate-200 dark:hover:border-slate-600" onclick="window.navigate('pegawai')">
+            <div class="flex items-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 px-3 py-1.5 rounded-xl transition border border-transparent hover:border-slate-200 dark:hover:border-slate-600" onclick="window.navigate('profil')">
                 <img id="header-foto-profil" src="${(currentUser.fotoProfil && currentUser.fotoProfil.length > 0) ? currentUser.fotoProfil[0] : `https://ui-avatars.com/api/?name=${currentUser.nama || 'User'}&background=e2e8f0`}" class="w-9 h-9 rounded-full object-cover mr-2 md:mr-3 border-2 border-slate-200 shadow-sm">
                 <span id="header-nama-profil" class="font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">${currentUser.nama || 'User'}</span>
             </div>
@@ -97,6 +174,10 @@ export function renderLayout() {
         </div>
     `;
 }
+
+window.kembaliKeStart = function() {
+    document.body.classList.remove('app-open');
+};
 
 window.renderSidebarMenu = function() {
     const currentUser = getFreshUser();
@@ -113,6 +194,7 @@ window.renderSidebarMenu = function() {
     const wewenangMatrix = lembaga.wewenangMatrix || {};
 
     let allowedMenuIds = new Set();
+    // Administrator & SA otomatis mendapatkan semua menu
     if (isSA_Admin) {
         MENU_ITEMS.forEach(m => allowedMenuIds.add(m.id));
     } else {
@@ -125,12 +207,11 @@ window.renderSidebarMenu = function() {
         });
     }
 
-    if (!isSuperAdmin) allowedMenuIds.delete('lisensi'); 
+    if (!isSuperAdmin) allowedMenuIds.delete('lisensi'); // Lisensi murni 100% hanya SA
 
     const filteredMenus = MENU_ITEMS.filter(m => allowedMenuIds.has(m.id));
     const sidebar = document.getElementById('app-sidebar');
     
-    // Tentukan teks status lisensi
     const trialEnd = lembaga.masaUjiCobaAkhir || "";
     let statusLisensi = "Lisensi Standar";
     if (trialEnd) {
@@ -145,9 +226,9 @@ window.renderSidebarMenu = function() {
         sidebar.innerHTML = `
             <div class="p-4 border-b border-slate-200">
                 <div class="font-black text-xl text-primary">Portal Yayasan</div>
-                <div class="text-amber-600 mt-1 font-bold" style="font-family: 'Comic Sans MS', 'Caveat', cursive; font-size: 1.15rem; transform: rotate(-3deg); transform-origin: left center;">${statusLisensi}</div>
+                <div class="text-amber-600 mt-1 font-bold" style="font-family: 'Caveat', 'Comic Sans MS', cursive; font-size: 1.15rem; transform: rotate(-3deg); transform-origin: left center;">${statusLisensi}</div>
             </div>
-            <nav class="flex-1 p-3 space-y-2 overflow-y-auto custom-scrollbar pb-24">
+            <nav class="flex-1 p-3 space-y-2 overflow-y-auto custom-scrollbar">
                 ${filteredMenus.map(m => {
                     let lockIcon = '';
                     if (m.id === 'tugas' && !window.cekLisensi('tugas_pegawai')) lockIcon = '<i class="fa-solid fa-lock text-amber-500 ml-auto text-xs" title="Tersegel Premium"></i>';
@@ -157,7 +238,6 @@ window.renderSidebarMenu = function() {
                     let btnClass = window.currentPage === m.id ? 'bg-blue-50 text-blue-600 font-bold' : 'text-slate-600 hover:bg-blue-50 dark:hover:bg-slate-700';
                     let iClass = window.currentPage === m.id ? 'text-blue-500' : 'text-slate-400';
                     
-                    // Pewarnaan khusus untuk Tab Terakhir (Permintaan Anda)
                     if (m.id === 'lembaga') {
                         btnClass = window.currentPage === m.id ? 'bg-rose-100 text-rose-800 font-bold' : 'text-rose-800 bg-rose-50 hover:bg-rose-100 hover:text-rose-900';
                         iClass = window.currentPage === m.id ? 'text-rose-700' : 'text-rose-600';
@@ -693,6 +773,7 @@ window.simpanAturDasbor = async function() {
 };
 
 window.navigate = function(page) {
+    document.body.classList.add('app-open');
     window.currentPage = page;
     window.renderSidebarMenu(); 
 
@@ -712,7 +793,7 @@ window.navigate = function(page) {
     
     let hasAccess = false;
     
-    if (isSA_Admin || page === 'dashboard') {
+    if (isSA_Admin || page === 'dashboard' || page === 'profil') {
         hasAccess = true;
     } else if (page === 'ppdb' && isKepala) {
         hasAccess = true; 
@@ -725,7 +806,7 @@ window.navigate = function(page) {
 
     if (!hasAccess) {
         alert("Akses Ditolak: Anda tidak memiliki wewenang untuk membuka halaman ini.");
-        window.navigate('dashboard'); 
+        window.kembaliKeStart();
         return;
     }
 
@@ -736,7 +817,7 @@ window.navigate = function(page) {
     if (page === 'tugas' && !window.cekLisensi('tugas_pegawai')) return container.innerHTML = window.renderLockedPremiumHTML('Manajemen Tugas Pegawai (Kanban)');
     if (page === 'ppdb' && !window.cekLisensi('ppdb_online')) return container.innerHTML = window.renderLockedPremiumHTML('Sistem PPDB Online & QRIS');
     if (page === 'kalender' && !window.cekLisensi('kalender_plus')) return container.innerHTML = window.renderLockedPremiumHTML('Kalender Pendidikan Terpadu');
-    if (page === 'lisensi' && !isSuperAdmin) { alert("Ditolak!"); window.navigate('dashboard'); return; }
+    if (page === 'lisensi' && !isSuperAdmin) { alert("Ditolak!"); window.kembaliKeStart(); return; }
 
     if (page === 'dashboard') {
         let savedConfig = lembaga.dashboardConfig || {};
@@ -1073,5 +1154,6 @@ window.navigate = function(page) {
     } else if (page === 'keuangan') { renderHalamanKeuangan(container); 
     } else if (page === 'ppdb') { renderHalamanPPDB(container); 
     } else if (page === 'lisensi') { renderHalamanLisensi(container); 
+    } else if (page === 'profil') { window.renderProfilCV(container);
     }
 };
