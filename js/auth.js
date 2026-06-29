@@ -42,14 +42,27 @@ export function cekAksesSistem() {
     if (!window.currentUser) {
         document.getElementById('view-container').innerHTML = `
             <div class="flex flex-col items-center justify-center h-full w-full max-w-sm mx-auto mt-20">
-                <form onsubmit="handleLogin(event)" class="bg-white dark:bg-slate-800 p-8 rounded-xl shadow-lg w-full border border-slate-200 dark:border-slate-700">
-                    <div class="text-center mb-6">
+                <form onsubmit="handleLogin(event)" class="bg-white dark:bg-slate-800 p-8 rounded-xl shadow-lg w-full border border-slate-200 dark:border-slate-700 relative">
+                    
+                    <button type="button" onclick="window.location.reload(true)" class="absolute top-4 right-4 text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 w-8 h-8 rounded-full flex items-center justify-center transition shadow-sm border border-slate-100" title="Muat Ulang Paksa (Hard Refresh)">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                    </button>
+
+                    <div class="text-center mb-6 mt-2">
                         <i class="fa-solid fa-shield-halved text-4xl text-primary mb-2"></i>
-                        <h2 class="text-2xl font-bold">Portal Yayasan</h2>
+                        <h2 class="text-2xl font-bold text-slate-800">Portal Yayasan</h2>
                     </div>
-                    <input type="text" id="login-user" placeholder="Username" class="w-full border p-3 mb-4 rounded focus:outline-primary dark:bg-slate-700 dark:border-slate-600" required>
-                    <input type="password" id="login-pass" placeholder="Password" class="w-full border p-3 mb-6 rounded focus:outline-primary dark:bg-slate-700 dark:border-slate-600" required>
-                    <button type="submit" id="btn-login" class="w-full bg-primary hover:bg-blue-700 text-white p-3 rounded font-bold transition">Masuk</button>
+                    
+                    <input type="text" id="login-user" placeholder="Username" class="w-full border-2 border-slate-200 p-3 mb-4 rounded-lg focus:outline-primary font-bold text-slate-700 bg-slate-50" required>
+                    
+                    <div class="relative mb-6">
+                        <input type="password" id="login-pass" placeholder="Password" class="w-full border-2 border-slate-200 p-3 rounded-lg focus:outline-primary font-bold text-slate-700 bg-slate-50 pr-10" required>
+                        <button type="button" onclick="let p=document.getElementById('login-pass'); let ic=document.getElementById('eye-icon'); if(p.type==='password'){p.type='text'; ic.className='fa-solid fa-eye-slash';}else{p.type='password'; ic.className='fa-solid fa-eye';}" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-indigo-600 transition">
+                            <i id="eye-icon" class="fa-solid fa-eye text-lg"></i>
+                        </button>
+                    </div>
+
+                    <button type="submit" id="btn-login" class="w-full bg-primary hover:bg-blue-700 text-white py-3.5 rounded-lg font-black shadow-lg transition transform hover:-translate-y-1 text-lg">Masuk</button>
                 </form>
             </div>
         `;
