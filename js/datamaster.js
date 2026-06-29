@@ -697,6 +697,17 @@ export function renderHalamanPegawai(container) {
                             <h3 class="font-bold text-slate-400 text-xs uppercase tracking-wider mb-3 mt-6"><i class="fa-solid fa-address-book mr-2"></i> Biodata Tambahan & Personal</h3>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Status Pegawai</label><select id="peg-status-pegawai" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-bold text-slate-700 cursor-pointer"><option value="">-- Pilih Status --</option><option value="Tetap">Tetap</option><option value="Kontrak (PKWT)">Kontrak (PKWT)</option><option value="Harian">Harian</option><option value="Freelance">Freelance</option></select></div>
+                                <div>
+        <label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Pendidikan Terakhir</label>
+        <select id="peg-pendidikan" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-bold text-slate-700 cursor-pointer">
+            <option value="">-- Pilih --</option>
+            <option value="SMA/Sederajat">SMA/Sederajat</option>
+            <option value="D1-D3">D1-D3</option>
+            <option value="S1/D4">S1/D4</option>
+            <option value="S2">S2</option>
+            <option value="S3">S3</option>
+        </select>
+    </div>
                                 <div><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">NPWP</label><input type="text" id="peg-npwp" placeholder="Opsional" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-medium"></div>
                                 <div><label class="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Mulai Bergabung</label><input type="date" id="peg-tgl-gabung" class="border-2 border-slate-200 p-3 rounded-xl w-full focus:outline-indigo-500 bg-slate-50 font-medium"></div>
                                 
