@@ -2318,9 +2318,21 @@ window.eksporDataCSV = function(stateKey, fileName) {
     if (data.length === 0) return alert("Tidak ada data untuk diekspor.");
     const separator = ';';
     
-    let headersSet = new Set();
-    data.forEach(item => Object.keys(item).forEach(k => headersSet.add(k)));
-    const headers = Array.from(headersSet).filter(h => h !== 'id'); 
+    // 1. Tentukan urutan prioritas header manual agar rapi
+    const prioritasHeader = {
+        'pegawai': ['nama', 'nik', 'nip', 'jk', 'tempatLahir', 'tglLahir', 'agama', 'pendidikan', 'statusPegawai', 'hakAkses', 'username', 'noHp', 'email', 'alamat', 'npwp', 'nuptk', 'serdik', 'waliKelas'],
+        'anak': ['nama', 'nisn', 'nis', 'nik', 'jk', 'kelas', 'statusAkademik', 'status', 'tempatLahir', 'tglLahir', 'agama', 'namaAyah', 'namaIbu', 'noHpWali', 'alamat'],
+        'lembaga': ['namaLembaga', 'npsn', 'nsm', 'jenisLembaga', 'statusLembaga', 'bentukPendidikan', 'alamat']
+    };
+
+    let headers = prioritasHeader[stateKey] || [];
+    
+    // 2. Ambil sisa key yang mungkin tidak ada di daftar prioritas (dinamis)
+    let headersSet = new Set(headers);
+    data.forEach(item => Object.keys(item).forEach(k => {
+        if(k !== 'id' && !headersSet.has(k)) headersSet.add(k);
+    }));
+    headers = Array.from(headersSet);
     
     let csvContent = "\uFEFF" + headers.join(separator) + "\n";
     data.forEach(row => {
